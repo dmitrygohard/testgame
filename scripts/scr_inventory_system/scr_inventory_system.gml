@@ -308,46 +308,60 @@ function EquipItem(item_index, character_index, slot_type) {
     if (variable_global_exists("update_companion_buff_system")) {
         update_companion_buff_system();
     }
-    // Безопасно добавляем бонусы с проверкой на существование
+   // Безопасно добавляем бонусы с проверкой на существование
     var perm_strength = db_data[? "perm_strength"];
     if (!is_undefined(perm_strength)) {
-        global.hero.equipment_bonuses.perm_strength += perm_strength;
-        global.hero.strength += perm_strength;
+        global.hero.equipment_bonuses.perm_strength = global.hero.equipment_bonuses.perm_strength + perm_strength;
+        global.hero.strength = global.hero.strength + perm_strength;
     }
-    
+
     var perm_intelligence = db_data[? "perm_intelligence"];
     if (!is_undefined(perm_intelligence)) {
-        global.hero.equipment_bonuses.perm_intelligence += perm_intelligence;
-        global.hero.intelligence += perm_intelligence;
+        global.hero.equipment_bonuses.perm_intelligence = global.hero.equipment_bonuses.perm_intelligence + perm_intelligence;
+        global.hero.intelligence = global.hero.intelligence + perm_intelligence;
     }
-    
+
     var perm_agility = db_data[? "perm_agility"];
     if (!is_undefined(perm_agility)) {
-        global.hero.equipment_bonuses.perm_agility += perm_agility;
-        global.hero.agility += perm_agility;
+        global.hero.equipment_bonuses.perm_agility = global.hero.equipment_bonuses.perm_agility + perm_agility;
+        global.hero.agility = global.hero.agility + perm_agility;
     }
-    
+
     // БЕЗОПАСНО ПРИМЕНЯЕМ ВСЕ БОНУСЫ ОТ ПРЕДМЕТА (С ПРОВЕРКОЙ НА СУЩЕСТВОВАНИЕ)
     var strength_bonus = db_data[? "strength_bonus"];
-    if (!is_undefined(strength_bonus)) global.hero.equipment_bonuses.strength += strength_bonus;
-    
+    if (!is_undefined(strength_bonus)) {
+        global.hero.equipment_bonuses.strength = global.hero.equipment_bonuses.strength + strength_bonus;
+    }
+
     var agility_bonus = db_data[? "agility_bonus"];
-    if (!is_undefined(agility_bonus)) global.hero.equipment_bonuses.agility += agility_bonus;
-    
+    if (!is_undefined(agility_bonus)) {
+        global.hero.equipment_bonuses.agility = global.hero.equipment_bonuses.agility + agility_bonus;
+    }
+
     var intelligence_bonus = db_data[? "intelligence_bonus"];
-    if (!is_undefined(intelligence_bonus)) global.hero.equipment_bonuses.intelligence += intelligence_bonus;
-    
+    if (!is_undefined(intelligence_bonus)) {
+        global.hero.equipment_bonuses.intelligence = global.hero.equipment_bonuses.intelligence + intelligence_bonus;
+    }
+
     var defense_bonus = db_data[? "defense_bonus"];
-    if (!is_undefined(defense_bonus)) global.hero.equipment_bonuses.defense += defense_bonus;
-    
+    if (!is_undefined(defense_bonus)) {
+        global.hero.equipment_bonuses.defense = global.hero.equipment_bonuses.defense + defense_bonus;
+    }
+
     var max_health_bonus = db_data[? "max_health_bonus"];
-    if (!is_undefined(max_health_bonus)) global.hero.equipment_bonuses.max_health += max_health_bonus;
-    
+    if (!is_undefined(max_health_bonus)) {
+        global.hero.equipment_bonuses.max_health = global.hero.equipment_bonuses.max_health + max_health_bonus;
+    }
+
     var gold_bonus = db_data[? "gold_bonus"];
-    if (!is_undefined(gold_bonus)) global.hero.equipment_bonuses.gold_bonus += gold_bonus;
-    
+    if (!is_undefined(gold_bonus)) {
+        global.hero.equipment_bonuses.gold_bonus = global.hero.equipment_bonuses.gold_bonus + gold_bonus;
+    }
+
     var health_bonus = db_data[? "health_bonus"];
-    if (!is_undefined(health_bonus)) global.hero.equipment_bonuses.health_bonus += health_bonus;
+    if (!is_undefined(health_bonus)) {
+        global.hero.equipment_bonuses.health_bonus = global.hero.equipment_bonuses.health_bonus + health_bonus;
+    }
     
     // ПРИМЕНЯЕМ СПЕЦИАЛЬНЫЕ ЭФФЕКТЫ АРТЕФАКТОВ
     apply_artifact_effects(item_id);
