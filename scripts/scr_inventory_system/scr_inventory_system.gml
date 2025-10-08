@@ -20,9 +20,12 @@ function init_inventory_system() {
         });
     }
 
-    if (!variable_global_exists("playerInventory")) {
-        global.playerInventory = ds_list_create();
+    if (variable_global_exists("playerInventory") && ds_exists(global.playerInventory, ds_type_list)) {
+        inventory_clear_all();
+        ds_list_destroy(global.playerInventory);
     }
+
+    global.playerInventory = ds_list_create();
 
     // Всегда работаем с экипировкой главного героя по умолчанию
     global.selected_hero_index = 0;
@@ -78,6 +81,34 @@ function ensure_equipment_bonus_defaults() {
         }
     }
 }
+
+function inventory_destroy_item_database() {
+    if (!variable_global_exists("ItemDB")) {
+        return;
+    }
+
+    var db = global.ItemDB;
+    if (is_undefined(db)) {
+        return;
+    }
+
+    if (!ds_exists(db, ds_type_map)) {
+        return;
+    }
+
+    var keys = ds_map_keys_to_array(db);
+    for (var i = 0; i < array_length(keys); i++) {
+        var key = keys[i];
+        var entry = ds_map_find_value(db, key);
+        if (ds_exists(entry, ds_type_map)) {
+            ds_map_destroy(entry);
+        }
+    }
+
+    ds_map_destroy(db);
+    global.ItemDB = undefined;
+}
+
 
 function reapply_hero_artifact_effects() {
     if (!variable_global_exists("equipment_slots") || array_length(global.equipment_slots) == 0) {
@@ -862,7 +893,7 @@ function init_item_sets() {
 function scr_init_item_database() {
     show_debug_message("Инициализация расширенной базы данных предметов...");
 
-    if (variable_global_exists("ItemDB") && ds_exists(global.ItemDB, ds_type_map)) {
+   inventory_destroy_item_database();
         ds_map_destroy(global.ItemDB);
     }
 
@@ -1006,7 +1037,7 @@ function scr_init_item_database() {
     AddCompanionBuffProperties();
 
     show_debug_message("Расширенная база данных предметов успешно инициализирована: " + string(ds_map_size(global.ItemDB)) + " предметов");
-}
+
 
 // scr_init_item_database.gml - обновляем функцию AddItemProperties
 
@@ -1113,6 +1144,9 @@ function AddItemToDB(_id, _name, _type, _price, _desc, _str_bonus = 0, _int_bonu
     ds_map_add(item, "max_health_bonus", _max_health_bonus);
     ds_map_add(item, "health_bonus", _health_bonus);
     ds_map_add(item, "gold_bonus", _gold_bonus);
+	    ds_map_add(item, "perm_strength", 0);
+    ds_map_add(item, "perm_agility", 0);
+    ds_map_add(item, "perm_intelligence", 0);
 
     // Заглушки для временных эффектов и специальных свойств
     ds_map_add(item, "temp_strength", 0);

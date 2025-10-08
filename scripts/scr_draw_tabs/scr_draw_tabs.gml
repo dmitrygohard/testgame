@@ -707,18 +707,20 @@ function draw_equipment_section(x, y, width, height) {
 
             if (!is_undefined(next_goal) && next_goal != "") {
                 draw_set_color(ui_text_secondary);
-                                draw_text(x + padding + 12, set_y, "Следующая цель: " + string(next_goal));
+                draw_text(x + padding + 12, set_y, "Следующая цель: " + string(next_goal));
                 set_y += 16;
             }
 
             set_y += 4;
         }
-    } else {
-        draw_text(x + padding, set_y, "Соберите предметы сетов для уникальных эффектов");
-    }
-    draw_set_font(fnt_main);
-}
+    
 
+    if (!has_sets) {
+        draw_set_color(ui_text_secondary);
+        draw_text(x + padding, set_y, "Соберите предметы сетов для уникальных эффектов");
+	}
+    draw_set_font(fnt_main);
+	
 
 function inventory_get_rarity_color(rarity) {
     switch(rarity) {
@@ -766,6 +768,8 @@ function inventory_get_item_icon(db_data) {
         case global.ITEM_TYPE.ACCESSORY: return "💍";
         case global.ITEM_TYPE.POTION: return "🧪";
         case global.ITEM_TYPE.SCROLL: return "📜";
+		case global.ITEM_TYPE.RELIC: return "🗝️";
+        case global.ITEM_TYPE.RESOURCE: return "🪓";
         case global.ITEM_TYPE.TROPHY: return "🏆";
         default:
             if (inventory_source_get(db_data, "item_class", "") == "trophy") return "🏆";
@@ -800,6 +804,8 @@ function inventory_get_item_tag(db_data) {
         case global.ITEM_TYPE.ACCESSORY: return "Аксессуар · " + rarity_names[rarity_index];
         case global.ITEM_TYPE.POTION: return "Зелье · " + rarity_names[rarity_index];
         case global.ITEM_TYPE.SCROLL: return "Свиток · " + rarity_names[rarity_index];
+	    case global.ITEM_TYPE.RELIC: return "Реликвия · " + rarity_names[rarity_index];
+        case global.ITEM_TYPE.RESOURCE: return "Ресурс · " + rarity_names[rarity_index];
         case global.ITEM_TYPE.TROPHY: return "Трофей · Единственный";
         default:
             if (inventory_source_get(db_data, "item_class", "") == "trophy") return "Трофей · Единственный";
@@ -831,6 +837,15 @@ function inventory_collect_item_stats(db_data) {
     var gold_bonus = inventory_source_get(db_data, "gold_bonus", 0);
     if (gold_bonus != 0) array_push(segments, "💰 +" + string(gold_bonus) + "%");
 
+    var perm_strength = inventory_source_get(db_data, "perm_strength", 0);
+    if (perm_strength != 0) array_push(segments, "♾️⚔ +" + string(perm_strength));
+
+    var perm_agility = inventory_source_get(db_data, "perm_agility", 0);
+    if (perm_agility != 0) array_push(segments, "♾️⚡ +" + string(perm_agility));
+
+    var perm_intelligence = inventory_source_get(db_data, "perm_intelligence", 0);
+    if (perm_intelligence != 0) array_push(segments, "♾️🧠 +" + string(perm_intelligence));
+
     return segments;
 }
 
@@ -843,7 +858,7 @@ function inventory_collect_special_effects(db_data) {
     if (buff_type != "") {
         var details = inventory_source_get(db_data, "companion_buff_description", "");
         if (details == "") {
-            var power = inventory_source_get(db_data, "buff_power", 0);
+            var powerx = inventory_source_get(db_data, "buff_power", 0);
             switch (buff_type) {
                 case "hepo_success":
                     details = "🎯 +" + string(power) + "% к шансу успеха экспедиций.";
@@ -1398,4 +1413,5 @@ function handle_inventory_tab_click(mouse_x, mouse_y) {
         }
     }
     return false;
+}
 }
