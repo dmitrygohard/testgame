@@ -382,56 +382,127 @@ function EquipItem(item_index, character_index, slot_type) {
     return true;
 }
 
-function UnequipItem(character_index, slot_type) {
-    // Проверяем существование необходимых глобальных структур
+function UnequipItem(_character_index, _slot_type) {
     if (!variable_global_exists("equipment_slots")) {
         show_debug_message("Ошибка: equipment_slots не инициализирован!");
         return false;
     }
-    
+	
+    var total_slots = array_length(global.equipment_slots);
+    if (_character_index < 0 || _character_index >= total_slots) {
+        show_debug_message("Ошибка: индекс персонажа вне диапазона при снятии предмета.");
+        return false;
+    }
+	
+    var slot_struct = global.equipment_slots[_character_index];
+    if (!is_struct(slot_struct) || !variable_struct_exists(slot_struct, _slot_type)) {
+        show_debug_message("Ошибка: указанный слот экипировки не найден.");
+        return false;
+    }
+	
+    var item_id = variable_struct_get(slot_struct, _slot_type);
+    if (is_undefined(item_id) || item_id == -1) {
+        return false;
+    }
+	
     if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) {
-        show_debug_message("Ошибка: База данных предметов (ItemDB) не инициализирована!");
+        show_debug_message("Ошибка: база данных предметов не инициализирована.");
         return false;
     }
-    
-    // Проверяем существование героя
+
+    var item_data = ds_map_find_value(global.ItemDB, item_id);
+    if (item_data == -1) {show_debug_message("Ошибка: предмет с ID " + string(item_id) + " не найден в базе данных.");
+        return false;
+    }
+
     if (!variable_global_exists("hero")) {
-        show_debug_message("Ошибка: Герой не инициализирован!");
+        show_debug_message("Ошибка: герой не инициализирован при попытке снять предмет.");
         return false;
     }
-    
-    // Получаем ID предмета из слота
-    var item_id = variable_struct_get(global.equipment_slots[character_index], slot_type);
-    
-        global.hero.equipment_bonuses.perm_agility -= perm_agility;
-        global.hero.agility -= perm_agility;
+
+    ensure_equipment_bonus_defaults();
+
+    var strength_bonus = item_data[? "strength_bonus"];
+    if (!is_undefined(strength_bonus)) {
+        global.hero.equipment_bonuses.strength = global.hero.equipment_bonuses.strength - strength_bonus;
     }
-    
-    // СНИМАЕМ СПЕЦИАЛЬНЫЕ ЭФФЕКТЫ АРТЕФАКТОВ
+
+    var agility_bonus = item_data[? "agility_bonus"];
+    if (!is_undefined(agility_bonus)) {
+        global.hero.equipment_bonuses.agility = global.hero.equipment_bonuses.agility - agility_bonus;
+    }
+
+    var intelligence_bonus = item_data[? "intelligence_bonus"];
+    if (!is_undefined(intelligence_bonus)) {
+        global.hero.equipment_bonuses.intelligence = global.hero.equipment_bonuses.intelligence - intelligence_bonus;
+    }
+
+    var defense_bonus = item_data[? "defense_bonus"];
+    if (!is_undefined(defense_bonus)) {
+        global.hero.equipment_bonuses.defense = global.hero.equipment_bonuses.defense - defense_bonus;
+    }
+
+    var max_health_bonus = item_data[? "max_health_bonus"];
+    if (!is_undefined(max_health_bonus)) {
+        global.hero.equipment_bonuses.max_health = global.hero.equipment_bonuses.max_health - max_health_bonus;
+    }
+
+    var gold_bonus = item_data[? "gold_bonus"];
+    if (!is_undefined(gold_bonus)) {
+        global.hero.equipment_bonuses.gold_bonus = global.hero.equipment_bonuses.gold_bonus - gold_bonus;
+    }
+
+    var health_bonus = item_data[? "health_bonus"];
+    if (!is_undefined(health_bonus)) {
+        global.hero.equipment_bonuses.health_bonus = global.hero.equipment_bonuses.health_bonus - health_bonus;
+    }
+
+    var perm_strength = item_data[? "perm_strength"];
+    if (!is_undefined(perm_strength)) {
+        global.hero.equipment_bonuses.perm_strength = global.hero.equipment_bonuses.perm_strength - perm_strength;
+        global.hero.strength = global.hero.strength - perm_strength;
+    }
+
+    var perm_agility = item_data[? "perm_agility"];
+    if (!is_undefined(perm_agility)) {
+        global.hero.equipment_bonuses.perm_agility = global.hero.equipment_bonuses.perm_agility - perm_agility;
+        global.hero.agility = global.hero.agility - perm_agility;
+    }
+
+    var perm_intelligence = item_data[? "perm_intelligence"];
+    if (!is_undefined(perm_intelligence)) {
+        global.hero.equipment_bonuses.perm_intelligence = global.hero.equipment_bonuses.perm_intelligence - perm_intelligence;
+        global.hero.intelligence = global.hero.intelligence - perm_intelligence;
+    }
+
     remove_artifact_effects(item_id);
-    
-    // Возвращаем предмет в инвентарь
+
+    variable_struct_set(slot_struct, _slot_type, -1);
+
     if (!AddItemToInventory(item_id, 1)) {
-        show_debug_message("Ошибка: Не удалось добавить предмет в инвентарь. Возможно, он полон.");
-        return false;
+        show_debug_message("Предупреждение: не удалось вернуть предмет в инвентарь после снятия.");
     }
-    
-    // Пересчитываем бонусы
+
     if (variable_global_exists("calculate_companion_bonuses")) {
         calculate_companion_bonuses();
     }
-    
-    // Обновляем максимальное здоровье
+
     if (variable_global_exists("update_hero_max_health")) {
         update_hero_max_health();
     }
-    
-    // Очищаем слот экипировки
-    variable_struct_set(global.equipment_slots[character_index], slot_type, -1);
 
     update_equipment_set_bonuses();
 
-    add_notification("Снято: " + item_data[? "name"]);
+    if (variable_global_exists("update_companion_buff_system")) {
+        update_companion_buff_system();
+    }
+
+    var item_name = item_data[? "name"];
+    if (is_undefined(item_name)) {
+        item_name = "Предмет";
+    }
+
+    add_notification("Снято: " + string(item_name));
 
     return true;
 }
