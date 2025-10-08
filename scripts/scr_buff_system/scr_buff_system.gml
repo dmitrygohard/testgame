@@ -117,53 +117,6 @@ function init_buff_system() {
     global.buff_system.waiting_for_expedition_start = false;
 }
 
-/// @function clone_array(source_array)
-/// @description Глубокое копирование массивов для структур бафов
-function clone_array(source_array) {
-    if (is_undefined(source_array)) return source_array;
-
-    var len = array_length(source_array);
-    var result = array_create(len);
-
-    for (var i = 0; i < len; i++) {
-        var value = source_array[i];
-
-        if (is_array(value)) {
-            value = clone_array(value);
-        } else if (is_struct(value)) {
-            value = clone_struct(value);
-        }
-
-        result[i] = value;
-    }
-
-    return result;
-}
-
-/// @function clone_struct(source_struct)
-/// @description Глубокое копирование структур (бафов)
-function clone_struct(source_struct) {
-    if (is_undefined(source_struct)) return source_struct;
-
-    var names = variable_struct_get_names(source_struct);
-    var result = {};
-
-    for (var i = 0; i < array_length(names); i++) {
-        var key = names[i];
-        var value = variable_struct_get(source_struct, key);
-
-        if (is_array(value)) {
-            value = clone_array(value);
-        } else if (is_struct(value)) {
-            value = clone_struct(value);
-        }
-
-        variable_struct_set(result, key, value);
-    }
-
-    return result;
-}
-
 // Функция для определения количества бафов от помощниц
 function get_buff_count_from_companions() {
     var total_buffs = 0;
@@ -203,22 +156,22 @@ function select_random_buffs() {
     // Создаем копию доступных бафов
     var available_buffs = [];
     for (var i = 0; i < array_length(global.buff_database); i++) {
-        array_push(available_buffs, clone_struct(global.buff_database[i]));
+        array_push(available_buffs, global.buff_database[i]);
     }
     
     for (var i = 0; i < num_buffs; i++) {
         if (array_length(available_buffs) == 0) break;
         
         var random_index = irandom(array_length(available_buffs) - 1);
-        var selected_buff = clone_struct(available_buffs[random_index]);
-
+        var selected_buff = available_buffs[random_index];
+        
         // Усиливаем бафы в зависимости от среднего уровня помощниц - БЕЗ ОГРАНИЧЕНИЙ
         var avg_level = get_average_companion_level();
         selected_buff.value = selected_buff.value * (1 + avg_level * 0.1);
-
+        
         // Применяем безопасные значения ТОЛЬКО для скорости
         if (selected_buff.type == global.BUFF_TYPES.SPEED) {
-            selected_buff.value = clamp(selected_buff.value, 0.5, 0.9);
+            selected_buff.value = clamp(selected_buff.value, 0.1, 0.9);
         }
         
         array_push(global.buff_system.selected_buffs, selected_buff);
@@ -250,18 +203,20 @@ function apply_current_buff() {
 function apply_buff_effect(buff) {
     // Применяем безопасное значение (только для скорости)
     var safe_buff = apply_safe_buff_value(buff);
-    // Обновляем исходную структуру, чтобы обратные эффекты использовали безопасное значение
-    buff.value = safe_buff.value;
-
+    
     // Инициализируем свойства equipment_bonuses если они отсутствуют
     if (!variable_struct_exists(global.hero, "equipment_bonuses")) {
         global.hero.equipment_bonuses = {};
     }
-
+    
     if (!variable_struct_exists(global.hero.equipment_bonuses, "strength")) global.hero.equipment_bonuses.strength = 0;
     if (!variable_struct_exists(global.hero.equipment_bonuses, "defense")) global.hero.equipment_bonuses.defense = 0;
     if (!variable_struct_exists(global.hero.equipment_bonuses, "intelligence")) global.hero.equipment_bonuses.intelligence = 0;
     if (!variable_struct_exists(global.hero.equipment_bonuses, "max_health")) global.hero.equipment_bonuses.max_health = 0;
+    // В функции инициализации героя, после создания equipment_bonuses
+global.hero.equipment_bonuses.perm_strength = 0;
+global.hero.equipment_bonuses.perm_intelligence = 0;
+global.hero.equipment_bonuses.perm_agility = 0;
     switch(safe_buff.type) {
         case global.BUFF_TYPES.STRENGTH:
             global.hero.equipment_bonuses.strength += safe_buff.value; // Прогрессивное стакание
@@ -339,21 +294,9 @@ function start_expedition_direct(difficulty_index) {
         if (variable_global_exists("apply_companion_item_buffs_to_expedition")) {
             apply_companion_item_buffs_to_expedition();
         }
-
-        if (variable_global_exists("equipment_set_effects") && is_struct(global.equipment_set_effects)) {
-            var set_effects = global.equipment_set_effects;
-            if (set_effects.speed_multiplier != 1.0) {
-                var clamped_speed = clamp(set_effects.speed_multiplier, 0.25, 1.0);
-                global.expedition.duration = max(60, round(global.expedition.duration * clamped_speed));
-            }
-
-            if (set_effects.success_bonus != 0) {
-                global.expedition.success_chance = clamp(global.expedition.success_chance + set_effects.success_bonus, 5, 95);
-            }
-        }
-
+        
         add_notification("Экспедиция '" + diff.name + "' началась!");
-
+        
         show_debug_message("Экспедиция успешно запущена: " + diff.name + ", длительность: " + string(global.expedition.duration));
     } else {
         show_debug_message("Ошибка запуска экспедиции: active=" + string(global.expedition.active) + ", difficulty_index=" + string(difficulty_index));
@@ -610,13 +553,16 @@ function update_temp_buffs() {
 }
 // Функция для безопасного применения значений бафов (только для скорости)
 function apply_safe_buff_value(buff) {
+    var safe_buff = buff;
+    
+    // ТОЛЬКО для скорости гарантируем корректные значения
     if (buff.type == global.BUFF_TYPES.SPEED) {
-        var safe_buff = clone_struct(buff);
+        // Скорость: значение между 0.1 и 0.9 (ускорение от 10% до 90%)
         safe_buff.value = clamp(buff.value, 0.5, 0.9);
-        return safe_buff;
     }
-
-    return buff;
+    // Все остальные бафы остаются без изменений для прогрессии
+    
+    return safe_buff;
 }
 // В конец файла scr_buff_system.gml добавляем:
 
@@ -1011,12 +957,7 @@ function complete_expedition() {
     // Базовые награды
     var gold_reward = irandom_range(diff.reward_min, diff.reward_max);
     var exp_reward = 25 * (global.expedition.difficulty + 1);
-
-    var equipment_effects = undefined;
-    if (variable_global_exists("equipment_set_effects")) {
-        equipment_effects = global.equipment_set_effects;
-    }
-
+    
     // Проверяем двойную атаку
     var is_double_attack = handle_double_attack();
     if (is_double_attack) {
@@ -1028,27 +969,18 @@ function complete_expedition() {
     // Применяем множитель награды от Концепции Победы
     gold_reward = floor(gold_reward * global.expedition_reward_multiplier);
     exp_reward = floor(exp_reward * global.expedition_reward_multiplier);
-
-    if (is_struct(equipment_effects)) {
-        gold_reward = floor(gold_reward * equipment_effects.reward_multiplier);
-        exp_reward = floor(exp_reward * equipment_effects.reward_multiplier);
-    }
-
+    
     // Бонус от бафов и помощниц
     var gold_mod = get_buff_modifier(global.BUFF_TYPES.GOLD);
     gold_reward = gold_reward * (1 + gold_mod.additive / 100);
-
+    
     var companion_bonuses = get_active_companion_bonuses();
     gold_reward = gold_reward * (1 + companion_bonuses.gold / 100);
-
+    
     // БАФ ОТ ПРЕДМЕТОВ: Дисциплины (дополнительный бонус к золоту)
     var discipline_item_buff = get_companion_buff_modifier("discipline_gold");
     gold_reward = gold_reward * (1 + discipline_item_buff / 100);
-
-    if (variable_struct_exists(global.hero.equipment_bonuses, "gold_bonus")) {
-        gold_reward = gold_reward * (1 + global.hero.equipment_bonuses.gold_bonus / 100);
-    }
-
+    
     // БАФ ОТ ПРЕДМЕТОВ: Проверка удвоения награды
     var reward_multiplier = check_double_rewards_chance();
     gold_reward = floor(gold_reward * reward_multiplier);
@@ -1064,12 +996,7 @@ function complete_expedition() {
         
         // Шанс выпадения предмета с учетом множителя
         var item_chance = 10 + (global.expedition.difficulty * 15);
-        var drop_multiplier = global.expedition_reward_multiplier;
-        if (is_struct(equipment_effects)) {
-            drop_multiplier *= equipment_effects.reward_multiplier;
-        }
-
-        if (random(100) < item_chance * drop_multiplier) {
+        if (random(100) < item_chance * global.expedition_reward_multiplier) {
             var item_id = get_random_expedition_item(global.expedition.difficulty);
             if (AddItemToInventory(item_id, 1)) {
                 var item_data = ds_map_find_value(global.ItemDB, item_id);
@@ -1103,7 +1030,7 @@ function complete_expedition() {
         }
         
         add_notification("Экспедиция успешна! +" + string(floor(gold_reward)) + " золота, получено " + string(actual_damage) + " урона");
-
+        
         // Авто-повтор для Эгиды и Гунгнира
         if (global.expedition_auto_repeat.enabled && global.expedition_auto_repeat.difficulties[global.expedition.difficulty]) {
             global.expedition_auto_repeat.completed_count++;
@@ -1111,15 +1038,11 @@ function complete_expedition() {
             start_expedition(global.expedition.difficulty);
             return; // Не снимаем бафы и не завершаем экспедицию
         }
-
-        check_trophies_after_expedition(true, gold_reward, actual_damage);
-
+        
     } else {
         var damage = irandom_range(20, 40) * (global.expedition.difficulty + 1);
         var actual_damage = hero_take_damage(damage);
         add_notification("Экспедиция провалилась! Получено " + string(actual_damage) + " урона");
-
-        check_trophies_after_expedition(false, 0, actual_damage);
     }
     
     // Снимаем бафы после завершения экспедиции (только если не авто-повтор)
@@ -1143,11 +1066,7 @@ function get_random_expedition_item(difficulty) {
     for (var i = 0; i < count; i++) {
         var item = ds_map_find_value(global.ItemDB, key);
         var item_rarity = item[? "rarity"];
-        if (item[? "type"] == global.ITEM_TYPE.TROPHY || item[? "item_class"] == "trophy") {
-            key = ds_map_find_next(global.ItemDB, key);
-            continue;
-        }
-
+        
         // Шанс выпадения предмета зависит от сложности и редкости
         var max_rarity = floor(difficulty / 2) + 1;
         if (item_rarity <= max_rarity) {

@@ -5,7 +5,7 @@ function draw_tabs_section(panel_y, panel_height) {
     var section_height = panel_height;
 
     // Вкладки
-    var tab_names = ["📊 Статистика", "🎒 Инвентарь", "🗺️ Экспедиции", "🛒 Магазин", "🏆 Трофеи", "✨ Способности"];
+    var tab_names = ["📊 Статистика", "🎒 Инвентарь", "🗺️ Экспедиции", "🛒 Магазин", "👥 Помощницы", "✨ Способности"];
     var tab_count = array_length(tab_names);
     
     // ВЫЧИСЛЯЕМ ширину вкладки - ДОБАВЬТЕ ЭТУ СТРОКУ
@@ -384,1003 +384,627 @@ function draw_combat_stats_section(x, y, width, height) {
 
 // scr_draw_tabs.gml - обновленная функция draw_inventory_tab и связанные функции
 
-
 function draw_inventory_tab(x, y, width, height) {
-    draw_modern_panel(x, y, width, height);
+    // НА АРЕНЕ HEPO: автоматически выбираем Hepo для экипировки
+    if (room == room_hepo_arena) {
+        global.selected_hero_index = 1; // 1 = Hepo (0=герой, 1=Hepo, 2=Fatty, 3=Discipline)
+    }
+    
+    draw_set_color(ui_text);
+    draw_text(x, y, "ИНВЕНТАРЬ"); 
 
-    if (!variable_global_exists("inv_scroll_offset")) global.inv_scroll_offset = 0;
-    if (!variable_global_exists("inv_scroll_dragging")) global.inv_scroll_dragging = false;
-
-    global.inv_buttons = [];
-    global.inventory_hover_tooltip = undefined;
-
-    var margin = 12;
-    var content_gap = 24;
-    var min_equipment_width = 240;
-    var max_equipment_width = max(min_equipment_width, width - 280);
-    var equipment_width = clamp(floor(width * 0.32), min_equipment_width, max_equipment_width);
-    var equipment_x = x + margin;
-    var inventory_x = equipment_x + equipment_width + content_gap;
-    var inventory_width = width - (equipment_width + content_gap + margin * 2);
-    var panel_height = height - margin * 2;
-
-        draw_inventory_equipment_panel(equipment_x, y + margin, equipment_width, panel_height);
-    draw_inventory_cards(inventory_x, y + margin, inventory_width, panel_height);
-
-    draw_inventory_tooltip();
+    // Разделяем на левую часть (экипировка) и правую (инвентарь)
+    var left_width = width * 0.4; 
+    var right_width = width * 0.6;
+    var right_x = x + left_width + 10;
+    
+    // Левая часть - экипировка
+    draw_equipment_section(x, y + 30, left_width, height - 30);
+    
+    // Правая часть - инвентарь в виде карточек
+    draw_inventory_cards(right_x, y + 30, right_width, height - 30);
 }
 
+// Обновленная функция draw_inventory_cards
 function draw_inventory_cards(x, y, width, height) {
-    draw_set_color(ui_bg_dark);
-    draw_rectangle(x, y, x + width, y + height, false);
-    draw_set_color(ui_border_color);
-    draw_rectangle(x, y, x + width, y + height, true);
-
-    var padding = 16;
-    var header_height = 32;
-
+    // Проверяем границы
+    if (x + width > global.screen_width) width = global.screen_width - x - 10;
+    if (y + height > global.screen_height) height = global.screen_height - y - 10;
+    
+    draw_set_color(ui_bg_medium);
+    
     draw_set_color(ui_text);
-    draw_text(x + padding, y + 6, "Коллекция предметов");
-
+    draw_text(x + 10, y + 10, "ПРЕДМЕТЫ В ИНВЕНТАРЕ");
+    
+    // Карточки предметов - проверяем минимальный размер
+    var cards_per_row = 3;
+    var card_width = floor((width - 40) / cards_per_row);
+    var card_height = 120;
+    
+    // ОГРАНИЧИВАЕМ минимальный размер карточки
+    card_width = max(card_width, 80);
+    card_height = max(card_height, 100);
+    
+    var start_x = x + 10;
+    var start_y = y + 40;
+    
     var total_items = ds_list_size(global.playerInventory);
-    var cards_per_row = max(2, floor((width - padding * 2) / 190));
-    var card_spacing = 14;
-    var available_width = width - padding * 2 - card_spacing * (cards_per_row - 1);
-    var card_width = floor(available_width / cards_per_row);
-    card_width = clamp(card_width, 150, 220);
-    var card_height = 118;
-
-    var total_rows = ceil(total_items / cards_per_row);
-    var content_height = total_rows * (card_height + card_spacing);
-    var visible_height = height - header_height - padding;
-
-    global.inv_max_scroll = max(0, content_height - visible_height);
+    var rows = ceil(total_items / cards_per_row);
+    var total_content_height = rows * (card_height + 10);
+    var visible_height = height - 50;
+    
+    // Рассчитываем максимальную прокрутку
+    global.inv_max_scroll = max(0, total_content_height - visible_height);
     global.inv_scroll_offset = clamp(global.inv_scroll_offset, 0, global.inv_max_scroll);
-
-    var start_x = x + padding;
-    var start_y = y + header_height;
-
+    
+    global.inv_buttons = []; // Очищаем кнопки инвентаря
+    
+    // Отрисовка карточек предметов
     for (var i = 0; i < total_items; i++) {
         var column = i mod cards_per_row;
         var row = i div cards_per_row;
-
-        var card_x = start_x + column * (card_width + card_spacing);
-        var card_y = start_y + row * (card_height + card_spacing) - global.inv_scroll_offset;
-
-        if (card_y + card_height < y + header_height - 4 || card_y > y + height) {
-            continue;
+        
+        var card_x = start_x + column * (card_width + 10);
+        var card_y = start_y + row * (card_height + 10) - global.inv_scroll_offset;
+        
+        // Проверяем, находится ли карточка в видимой области
+        if (card_y + card_height < y || card_y > y + height) {
+            continue; // Пропускаем невидимые карточки
         }
-
+        
         var item_data = ds_list_find_value(global.playerInventory, i);
         if (!is_undefined(item_data)) {
             var is_hovered = point_in_rectangle(mouse_x, mouse_y, card_x, card_y, card_x + card_width, card_y + card_height);
             draw_inventory_card(card_x, card_y, card_width, card_height, item_data, i, is_hovered);
         }
     }
-
+    
+    // Отрисовка ползунка прокрутки, если контент не помещается
     if (global.inv_max_scroll > 0) {
-        draw_inventory_scrollbar(x, y, width, height, content_height, visible_height, header_height);
+        draw_inventory_scrollbar(x, y, width, height, total_content_height, visible_height);
     } else {
         global.inv_scrollbar_rect = -1;
     }
-
+    
+    // Информация о пустом инвентаре
     if (total_items == 0) {
         draw_set_color(ui_text_secondary);
         draw_set_halign(fa_center);
-        draw_text(x + width/2, y + height/2, "Инвентарь пуст. Загляните в магазин или на экспедиции");
+        draw_text(x + width/2, y + height/2, "Инвентарь пуст\nКупите предметы в магазине");
         draw_set_halign(fa_left);
     }
 }
+
+// scr_draw_tabs.gml - обновленная функция draw_inventory_card
 
 function draw_inventory_card(x, y, width, height, item_data, index, is_hovered) {
-    if (is_undefined(item_data)) return;
-
+    // Проверяем, что item_data не undefined
+    if (is_undefined(item_data)) {
+        return;
+    }
+    
     var item_id = item_data[? "id"];
     var db_data = ds_map_find_value(global.ItemDB, item_id);
+    
     if (db_data == -1) return;
-
-    var rarity_color = inventory_get_rarity_color(db_data[? "rarity"]);
-    var left_color = merge_color(rarity_color, ui_bg_dark, 0.6);
-    var right_color = merge_color(rarity_color, c_white, 0.1);
-    var border_color = is_hovered ? merge_color(rarity_color, c_white, 0.35) : merge_color(rarity_color, ui_border_color, 0.25);
-
-    draw_rectangle_color(x, y, x + width, y + height, left_color, right_color, left_color, right_color, left_color);
-    draw_set_color(border_color);
-    draw_rectangle(x, y, x + width, y + height, true);
-
-    var icon_text = inventory_get_item_icon(db_data);
-    var icon_radius = 24;
-    var icon_cx = x + 28;
-    var icon_cy = y + 32;
-
-    draw_set_color(merge_color(rarity_color, c_white, 0.25));
-    draw_circle(icon_cx, icon_cy, icon_radius, false);
-    draw_set_color(c_white);
-    draw_set_halign(fa_center);
-    draw_set_valign(fa_middle);
-    draw_text(icon_cx, icon_cy - 4, icon_text);
-    draw_set_valign(fa_top);
-
-    var name_x = x + 60;
-    draw_set_color(c_white);
-    draw_set_halign(fa_left);
-    var name_text = string_copy(db_data[? "name"], 1, 24);
-    if (string_length(db_data[? "name"]) > 24) name_text += "…";
-    draw_text(name_x, y + 6, name_text);
-
+    
+    var rarity = db_data[? "rarity"];
+    var rarity_color = get_rarity_color(rarity);
     var quantity = item_data[? "quantity"];
-    if (quantity > 1) {
-        draw_set_color(ui_highlight);
-        draw_set_halign(fa_right);
-        draw_text(x + width - 8, y + 6, "x" + string(quantity));
-        draw_set_halign(fa_left);
-    }
-
-    draw_set_color(ui_text_secondary);
-    draw_text(name_x, y + 24, inventory_get_item_tag(db_data));
-
-    if (is_hovered) {
-        inventory_register_tooltip(item_id, quantity, "inventory");
-    }
-
-    var stat_segments = inventory_collect_item_stats(db_data);
-
-    draw_set_font(fnt_small);
-    if (array_length(stat_segments) > 0) {
-        draw_text(name_x, y + 42, array_join(stat_segments, "   "));
-    } else {
-        var desc = string_copy(db_data[? "description"], 1, 52);
-        if (string_length(db_data[? "description"]) > 52) desc += "...";
-        draw_text(name_x, y + 42, desc);
-    }
-    draw_set_font(fnt_main);
-
-    var set_progress_text = inventory_get_set_progress_text(item_id, db_data);
-    if (set_progress_text != "") {
-        draw_set_font(fnt_small);
-        draw_set_color(ui_text_secondary);
-        draw_text(name_x, y + height - 48, set_progress_text);
-        draw_set_font(fnt_main);
-    }
-
-    var button_defs = [];
     var item_type = db_data[? "type"];
     var equip_slot = db_data[? "equip_slot"];
-    var item_class = db_data[? "item_class"];
-    var can_equip = (equip_slot != -1);
-    var can_use = (item_type == global.ITEM_TYPE.POTION || item_type == global.ITEM_TYPE.SCROLL);
-    var can_sell = (item_class != "trophy");
-
-    if (can_equip) array_push(button_defs, { label: "Экипировать", type: "inventory_equip" });
-    if (can_use) array_push(button_defs, { label: "Использовать", type: "inventory_use" });
-    if (can_sell) array_push(button_defs, { label: "Продать", type: "inventory_sell" });
-
-    var button_count = array_length(button_defs);
-    if (button_count > 0) {
-        var button_area_y = y + height - 30;
-        var button_gap = 8;
-        var button_width = (width - 20 - button_gap * (button_count - 1));
-        if (button_count > 0) button_width = button_width / button_count;
-        var button_x = x + 10;
-
-        for (var b = 0; b < button_count; b++) {
-            var btn = button_defs[b];
-            var bx1 = button_x + b * (button_width + button_gap);
-            var bx2 = bx1 + button_width;
-            var by1 = button_area_y;
-            var by2 = button_area_y + 22;
-
-            var active_color = btn.type == "inventory_sell" ? ui_danger : ui_highlight;
-            draw_set_color(merge_color(active_color, c_white, 0.15));
-            draw_rectangle(bx1, by1, bx2, by2, false);
-            draw_set_color(border_color);
-            draw_rectangle(bx1, by1, bx2, by2, true);
-            draw_set_color(c_white);
-            draw_set_halign(fa_center);
-            draw_text((bx1 + bx2) / 2, by1 + 4, btn.label);
-            draw_set_halign(fa_left);
-
-            array_push(global.inv_buttons, {
-                type: btn.type,
-                cell_index: index,
-                x1: bx1, y1: by1,
-                x2: bx2, y2: by2
-            });
+    var can_equip = (equip_slot != -1); // Предмет можно экипировать
+    var can_use = (item_type == global.ITEM_TYPE.POTION || item_type == global.ITEM_TYPE.SCROLL); // Предмет можно использовать
+    
+    // Фон карточки с эффектом наведения
+    var card_bg_color = is_hovered ? merge_color(ui_bg_medium, c_white, 0.1) : ui_bg_medium;
+    draw_set_color(card_bg_color);
+    draw_rectangle(x, y, x + width, y + height, false);
+    
+    // Верхняя полоса редкости
+    var stripe_color = is_hovered ? merge_color(rarity_color, c_white, 0.2) : rarity_color;
+    draw_set_color(stripe_color);
+    draw_rectangle(x, y, x + width, y + 3, false);
+    
+    // Рамка карточки с эффектом наведения
+    var border_color = is_hovered ? merge_color(ui_border_color, c_white, 0.3) : ui_border_color;
+    draw_set_color(border_color);
+    draw_rectangle(x, y, x + width, y + height, true);
+    
+    // Иконка типа предмета
+    var icon_x = x + 8;
+    var icon_y = y + 8;
+    draw_item_type_icon_simple(icon_x, icon_y, item_type, is_hovered);
+    
+    // Название предмета (обрезаем если длинное)
+    var name = string_copy(db_data[? "name"], 1, 12);
+    if (string_length(db_data[? "name"]) > 12) name += "...";
+    
+    var name_color = is_hovered ? merge_color(ui_text, c_white, 0.2) : ui_text;
+    draw_set_color(name_color);
+    draw_set_font(fnt_main);
+    draw_text(x + 25, y + 10, name);
+    
+    // Индикатор возможности экипировки/использования
+    if (is_hovered) {
+        draw_set_color(ui_highlight);
+        draw_set_halign(fa_center);
+        if (can_equip) {
+            draw_text(x + width/2, y + 25, "👆 ЛКМ - экипировать");
+        } else if (can_use) {
+            draw_text(x + width/2, y + 25, "👆 ЛКМ - использовать");
+        }
+        draw_set_halign(fa_left);
+    }
+    
+    // Количество предметов (для стакающихся)
+    if (quantity > 1) {
+        draw_set_color(ui_text_secondary);
+        draw_set_halign(fa_right);
+        draw_text(x + width - 8, y + 10, "x" + string(quantity));
+        draw_set_halign(fa_left);
+    }
+    
+    // Разделительная линия
+    draw_set_color(is_hovered ? merge_color(ui_border_color, c_white, 0.1) : ui_border_color);
+    draw_rectangle(x + 5, y + 30, x + width - 5, y + 31, false);
+    
+    // Бонусы предмета в компактном формате
+    var bonus_y = y + 40;
+    var bonuses = [];
+    
+    if (db_data[? "strength_bonus"] > 0) {
+        array_push(bonuses, "💪 +" + string(db_data[? "strength_bonus"]));
+    }
+    if (db_data[? "defense_bonus"] > 0) {
+        array_push(bonuses, "🛡️ +" + string(db_data[? "defense_bonus"]));
+    }
+    if (db_data[? "intelligence_bonus"] > 0) {
+        array_push(bonuses, "🧠 +" + string(db_data[? "intelligence_bonus"]));
+    }
+    if (db_data[? "agility_bonus"] > 0) {
+        array_push(bonuses, "⚡ +" + string(db_data[? "agility_bonus"]));
+    }
+    
+    // Для зелий показываем эффекты
+    if (item_type == global.ITEM_TYPE.POTION) {
+        if (db_data[? "health"] > 0) {
+            array_push(bonuses, "❤️ +" + string(db_data[? "health"]));
+        }
+        if (db_data[? "temp_strength"] > 0) {
+            array_push(bonuses, "💪 +" + string(db_data[? "temp_strength"]));
         }
     }
-
-    if (can_sell) {
+    
+    // Для свитков показываем эффекты
+    if (item_type == global.ITEM_TYPE.SCROLL) {
+        if (db_data[? "instant_complete"] == true) {
+            array_push(bonuses, "⚡ Мгновенное завершение");
+        }
+        if (db_data[? "reward_multiplier"] > 0) {
+            array_push(bonuses, "💰 x" + string(db_data[? "reward_multiplier"]) + " награда");
+        }
+    }
+    
+    // Отрисовываем бонусы
+    if (array_length(bonuses) > 0) {
+        draw_set_color(ui_text);
+        draw_set_font(fnt_main);
+        
+        for (var i = 0; i < min(array_length(bonuses), 2); i++) {
+            var bonus_text = bonuses[i];
+            if (string_length(bonus_text) > 15) {
+                bonus_text = string_copy(bonus_text, 1, 12) + "...";
+            }
+            draw_text(x + 8, bonus_y + i * 15, bonus_text);
+        }
+    }
+    
+    // Цена продажи
+    var sell_price = get_sell_price(item_id, 1);
+    if (sell_price > 0) {
+        draw_set_color(ui_text_secondary);
+        draw_set_font(fnt_small);
+        draw_set_halign(fa_center);
+        draw_text(x + width/2, y + height, "Продажа: " + string(sell_price) + "g");
+        draw_set_halign(fa_left);
+        draw_set_font(fnt_main);
+    }
+    
+    // Кнопки действий
+    var action_y = y + height - 35;
+    var action_height = 20;
+    var button_width = width - 20;
+    
+    // Кнопка продажи
+    var is_sell_hovered = point_in_rectangle(mouse_x, mouse_y, x + 10, action_y, x + 10 + button_width, action_y + action_height);
+    var sell_btn_color = is_sell_hovered ? merge_color(ui_warning_color, c_white, 0.2) : ui_warning_color;
+    
+    draw_set_color(sell_btn_color);
+    draw_rectangle(x + 10, action_y, x + 10 + button_width, action_y + action_height, false);
+    
+    draw_set_color(ui_border_color);
+    draw_rectangle(x + 10, action_y, x + 10 + button_width, action_y + action_height, true);
+    
+    draw_set_color(ui_text);
+    draw_set_halign(fa_center);
+    //draw_text(x + 10 + button_width/2, action_y + action_height/2, "💰 Продать за " + string(sell_price) + "g");
+    draw_set_halign(fa_left);
+    
+    // Добавляем кнопки в массив для обработки кликов
+    
+    // Кнопка продажи
+    array_push(global.inv_buttons, {
+        type: "inventory_sell",
+        cell_index: index,
+        x1: x + 10, y1: action_y,
+        x2: x + 10 + button_width, y2: action_y + action_height
+    });
+    
+    // Кнопка экипировки или использования (вся карточка, кроме кнопки продажи)
+    if (can_equip) {
         array_push(global.inv_buttons, {
-            type: "inventory_card_quick_sell",
+            type: "inventory_equip",
             cell_index: index,
             x1: x, y1: y,
-            x2: x + width, y2: y + height
+            x2: x + width, y2: action_y - 5 // Исключаем область кнопки продажи
+        });
+    } else if (can_use) {
+        array_push(global.inv_buttons, {
+            type: "inventory_use",
+            cell_index: index,
+            x1: x, y1: y,
+            x2: x + width, y2: action_y - 5 // Исключаем область кнопки продажи
         });
     }
+    
+    // Также добавляем кнопку для всей карточки для быстрой продажи по правому клику
+    array_push(global.inv_buttons, {
+        type: "inventory_card_quick_sell",
+        cell_index: index,
+        x1: x, y1: y,
+        x2: x + width, y2: y + height
+    });
 }
-
+// Новая функция для экипировки предмета из инвентаря
 function equip_item_from_inventory(cell_index) {
     show_debug_message("=== ЭКИПИРОВКА ПРЕДМЕТА ИЗ ИНВЕНТАРЯ ===");
-
+    
+    // Проверяем существование инвентаря
     if (!variable_global_exists("playerInventory") || !ds_exists(global.playerInventory, ds_type_list)) {
         show_debug_message("Ошибка: Инвентарь не инициализирован!");
         return false;
     }
-
+    
+    // Проверяем корректность индекса
     if (cell_index < 0 || cell_index >= ds_list_size(global.playerInventory)) {
         show_debug_message("Ошибка: Неверный индекс предмета: " + string(cell_index));
         return false;
     }
-
+    
+    // Получаем данные предмета из инвентаря
     var item_data = ds_list_find_value(global.playerInventory, cell_index);
     if (is_undefined(item_data)) {
         show_debug_message("Ошибка: Данные предмета не найдены!");
         return false;
     }
-
+    
     var item_id = item_data[? "id"];
-
+    
+    // Проверяем существование базы данных предметов
     if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) {
         show_debug_message("Ошибка: База данных предметов не инициализирована!");
         return false;
     }
-
+    
+    // Получаем полные данные предмета из базы
     var db_data = ds_map_find_value(global.ItemDB, item_id);
     if (db_data == -1) {
         show_debug_message("Ошибка: Предмет с ID " + string(item_id) + " не найден в базе данных!");
         return false;
     }
-
+    
+    // Проверяем возможность экипировки
     var equip_slot = db_data[? "equip_slot"];
     if (equip_slot == -1) {
         add_notification("Этот предмет нельзя экипировать!");
         return false;
     }
-
+    
+    // Определяем тип слота для экипировки
     var slot_type = "";
     switch(equip_slot) {
-        case global.EQUIP_SLOT.WEAPON: slot_type = "weapon"; break;
-        case global.EQUIP_SLOT.ARMOR: slot_type = "armor"; break;
-        case global.EQUIP_SLOT.ACCESSORY: slot_type = "accessory"; break;
-        case global.EQUIP_SLOT.RELIC: slot_type = "relic"; break;
+        case global.EQUIP_SLOT.WEAPON: 
+            slot_type = "weapon"; 
+            break;
+        case global.EQUIP_SLOT.ARMOR: 
+            slot_type = "armor"; 
+            break;
+        case global.EQUIP_SLOT.ACCESSORY: 
+            slot_type = "accessory"; 
+            break;
+        case global.EQUIP_SLOT.RELIC: 
+            slot_type = "relic"; 
+            break;
         default:
             add_notification("Неизвестный тип слота для экипировки!");
             return false;
     }
-
-    var success = EquipItem(cell_index, 0, slot_type);
-
+    
+    show_debug_message("Экипировка предмета в слот: " + slot_type + " для героя: " + string(global.selected_hero_index));
+    
+    // Вызываем основную функцию экипировки
+    var success = EquipItem(cell_index, global.selected_hero_index, slot_type);
+    
     if (success) {
-        add_notification("Предмет экипирован на главного героя");
+        add_notification("Предмет экипирован на " + get_hero_name(global.selected_hero_index));
     } else {
         add_notification("Не удалось экипировать предмет!");
     }
-
+    
     return success;
 }
+
+// scr_draw_tabs.gml - убедитесь, что эта функция существует
 
 function get_hero_name(hero_index) {
     switch(hero_index) {
         case 0: return "Главного героя";
         case 1: return "Hepo";
-        case 2: return "Fatty";
+        case 2: return "Fatty"; 
         case 3: return "Discipline";
         default: return "Неизвестного героя";
     }
 }
-
-function draw_inventory_scrollbar(x, y, width, height, total_content_height, visible_height, header_height) {
+function draw_inventory_scrollbar(x, y, width, height, total_content_height, visible_height) {
     var scrollbar_width = 8;
-    var scrollbar_x = x + width - scrollbar_width - 6;
-    var track_y = y + header_height;
+    var scrollbar_x = x + width - scrollbar_width - 5;
     var scrollbar_track_height = visible_height;
-
-    var scrollbar_height = max(32, visible_height * (visible_height / total_content_height));
+    var track_y = y + 40;
+    
+    // Вычисляем размер и позицию ползунка
+    var scrollbar_height = max(30, visible_height * (visible_height / total_content_height));
     var scroll_ratio = global.inv_scroll_offset / global.inv_max_scroll;
     var scrollbar_y = track_y + scroll_ratio * (visible_height - scrollbar_height);
-
+    
+    // Фон ползунка (трек)
     draw_set_color(make_color_rgb(60, 60, 80));
     draw_rectangle(scrollbar_x, track_y, scrollbar_x + scrollbar_width, track_y + scrollbar_track_height, false);
-
+    
+    // Ползунок
     var slider_color = global.inv_scroll_dragging ? merge_color(ui_highlight, c_white, 0.3) : ui_highlight;
     draw_set_color(slider_color);
     draw_rectangle(scrollbar_x, scrollbar_y, scrollbar_x + scrollbar_width, scrollbar_y + scrollbar_height, false);
-
+    
+    // Сохраняем данные ползунка для обработки кликов
     global.inv_scrollbar_rect = {
-        x1: scrollbar_x,
-        y1: scrollbar_y,
-        x2: scrollbar_x + scrollbar_width,
+        x1: scrollbar_x, 
+        y1: scrollbar_y, 
+        x2: scrollbar_x + scrollbar_width, 
         y2: scrollbar_y + scrollbar_height,
         track_y1: track_y,
         track_y2: track_y + scrollbar_track_height
     };
 }
+// scr_draw_tabs.gml - исправленная функция draw_equipment_section
 
-function inventory_get_rarity_color(rarity) {
-    switch(rarity) {
-        case 0: return make_color_rgb(70, 75, 95);
-        case 1: return make_color_rgb(80, 105, 150);
-        case 2: return make_color_rgb(110, 140, 190);
-        case 3: return make_color_rgb(170, 120, 210);
-        default: return make_color_rgb(215, 150, 75);
-    }
-}
-
-function draw_inventory_equipment_panel(x, y, width, height) {
-    draw_set_color(ui_bg_dark);
-    draw_rectangle(x, y, x + width, y + height, false);
-    draw_set_color(ui_border_color);
-    draw_rectangle(x, y, x + width, y + height, true);
-
-    var padding = 14;
+function draw_equipment_section(x, y, width, height) {
+    draw_set_color(ui_bg_medium);
+    //draw_rectangle(x, y, x + width, y + height, false);
+    
     draw_set_color(ui_text);
-    draw_text(x + padding, y + 6, "Снаряжение героя");
-
-    var portrait_cx = x + width / 2;
-    var portrait_cy = y + 70;
-    var portrait_r = 40;
-
-    draw_set_color(make_color_rgb(55, 65, 95));
-    draw_circle(portrait_cx, portrait_cy, portrait_r + 4, false);
-    draw_set_color(merge_color(ui_highlight, c_white, 0.35));
-    draw_circle(portrait_cx, portrait_cy, portrait_r, false);
-    draw_set_color(c_white);
-    draw_set_halign(fa_center);
-    draw_set_valign(fa_middle);
-    draw_text(portrait_cx, portrait_cy - 4, "🛡️");
-    draw_set_valign(fa_top);
-
-    var hero_equipment = undefined;
-    if (variable_global_exists("equipment_slots") && is_array(global.equipment_slots) && array_length(global.equipment_slots) > 0) {
-        hero_equipment = global.equipment_slots[0];
+    draw_text(x + 10, y + 10, "ЭКИПИРОВКА");
+    
+    // Определяем вкладки героев в зависимости от комнаты
+    var tab_names;
+    var tab_width;
+    
+    // НА АРЕНЕ HEPO: показываем только вкладку Hepo
+    if (room == room_hepo_arena) {
+        tab_names = ["Hepo"];
+        tab_width = width;
+        // Гарантируем, что выбран Hepo
+        global.selected_hero_index = 1;
+    } else {
+        // В основной комнате - все герои
+        tab_names = ["Герой", "Hepo", "Fatty", "Discipline"];
+        tab_width = width / array_length(tab_names);
     }
-
-    if (!is_struct(hero_equipment)) {
-        hero_equipment = {
-            weapon: -1,
-            armor: -1,
-            accessory: -1,
-            relic: -1
-        };
+    
+    var tab_height = 25;
+    
+    // Отрисовываем вкладки героев
+    for (var i = 0; i < array_length(tab_names); i++) {
+        var tab_x = x + i * tab_width;
+        var is_active = (i == global.selected_hero_index);
+        var is_hovered = point_in_rectangle(mouse_x, mouse_y, tab_x, y + 40, tab_x + tab_width, y + 40 + tab_height);
+        
+        // Цвет вкладки (активная/неактивная) с эффектом наведения
+        var tab_color = is_active ? ui_highlight : (is_hovered ? ui_bg_accent : ui_bg_dark);
+        
+        draw_set_color(tab_color);
+        draw_rectangle(tab_x, y + 40, tab_x + tab_width, y + 40 + tab_height, false);
+        
+        // Рамка вкладки
+        draw_set_color(is_active ? ui_highlight : ui_border_color);
+        draw_rectangle(tab_x, y + 40, tab_x + tab_width, y + 40 + tab_height, true);
+        
+        // Текст вкладки
+        draw_set_color(is_active ? c_white : ui_text);
+        draw_set_halign(fa_center);
+        draw_text(tab_x + tab_width/2, y + 40 + tab_height/2 - 5, tab_names[i]);
+        draw_set_halign(fa_left);
+        
+        // Добавляем кнопку вкладки для обработки кликов (только если не на арене Hepo)
+        if (room != room_hepo_arena) {
+            array_push(global.inv_buttons, {
+                type: "hero_tab",
+                index: i,
+                x1: tab_x, y1: y + 40,
+                x2: tab_x + tab_width, y2: y + 40 + tab_height
+            });
+        }
     }
-
-    var slot_size = 72;
-    var slot_gap = 26;
-    var grid_width = slot_size * 2 + slot_gap;
-    var grid_x = x + (width - grid_width) / 2;
-    var grid_y = portrait_cy + portrait_r + 20;
-
-    var slots = [
-        { type: "weapon", name: "Оружие", col: 0, row: 0 },
-        { type: "armor", name: "Броня", col: 1, row: 0 },
-        { type: "accessory", name: "Аксессуар", col: 0, row: 1 },
-        { type: "relic", name: "Реликвия", col: 1, row: 1 }
-    ];
-
+    
+    // Слоты экипировки для выбранного персонажа - ГОРИЗОНТАЛЬНОЕ РАСПОЛОЖЕНИЕ
+    var slots_y = y + 40 + tab_height + 20;
+    var slot_size = 60;
+    
+    // Определяем слоты для выбранного персонажа
+    var slots = [];
+    if (global.selected_hero_index == 0) {
+        // Главный герой: оружие, броня, аксессуар, реликвия
+        var total_slots_width = slot_size * 3 + 20 * 2;
+        var start_x = x + (width - total_slots_width) / 2;
+        
+        slots = [
+            { type: "weapon", name: "Оружие", x: start_x, y: slots_y },
+            { type: "armor", name: "Броня", x: start_x, y: slots_y + slot_size + 30 },
+            { type: "accessory", name: "Аксессуар", x: start_x + (slot_size + 9) * 2.5, y: slots_y },
+            { type: "relic", name: "Реликвия", x: start_x + (slot_size + 9) * 2.5, y: slots_y + slot_size + 30 }
+        ];
+    } else {
+        // Помощницы: оружие и броня
+        var total_slots_width = slot_size * 2 + 10;
+        var start_x = x + (width - total_slots_width) / 2;
+        
+        slots = [
+            { type: "weapon", name: "Оружие", x: start_x - 35, y: slots_y },
+            { type: "armor", name: "Броня", x: start_x + slot_size + 60, y: slots_y },
+            { type: "accessory", name: "Аксессуар", x: start_x - 50 + slot_size + 30, y: slots_y + 120 }
+        ];
+    }
+    
+    // Отрисовка слотов
     for (var i = 0; i < array_length(slots); i++) {
         var slot = slots[i];
-        var slot_x = grid_x + slot.col * (slot_size + slot_gap);
-        var slot_y = grid_y + slot.row * (slot_size + slot_gap);
-
-        var item_id = -1;
-        if (variable_struct_exists(hero_equipment, slot.type)) {
-            item_id = variable_struct_get(hero_equipment, slot.type);
-        }
-
-        var filled = (is_real(item_id) && item_id >= 0);
-        var hovered = point_in_rectangle(mouse_x, mouse_y, slot_x, slot_y, slot_x + slot_size, slot_y + slot_size);
-
-        var slot_color = filled
-            ? merge_color(ui_highlight, c_white, hovered ? 0.35 : 0.2)
-            : merge_color(ui_bg_dark, c_white, hovered ? 0.25 : 0.1);
-
+        
+        // Проверяем, есть ли предмет в слоте
+        var item_id = variable_struct_get(global.equipment_slots[global.selected_hero_index], slot.type);
+        var is_slot_filled = (item_id != -1);
+        var is_hovered = point_in_rectangle(mouse_x, mouse_y, slot.x, slot.y, slot.x + slot_size, slot.y + slot_size);
+        
+        // Цвет слота (заполненный/пустой) с эффектом наведения
+        var slot_color = is_slot_filled ? 
+            (is_hovered ? merge_color(ui_success_color, c_white, 0.2) : ui_success_color) : 
+            (is_hovered ? merge_color(ui_bg_dark, c_white, 0.1) : ui_bg_dark);
+        
+        // Фон слота
         draw_set_color(slot_color);
-        draw_rectangle(slot_x, slot_y, slot_x + slot_size, slot_y + slot_size, false);
-        draw_set_color(ui_border_color);
-        draw_rectangle(slot_x, slot_y, slot_x + slot_size, slot_y + slot_size, true);
-
-        if (filled) {
-            var slot_item = inventory_fetch_item_definition(item_id);
-            if (!is_undefined(slot_item)) {
-                draw_set_color(c_white);
+        draw_rectangle(slot.x, slot.y, slot.x + slot_size, slot.y + slot_size, false);
+        
+        // Рамка слота
+        var border_color = is_hovered ? merge_color(ui_border_color, c_white, 0.2) : ui_border_color;
+        draw_set_color(border_color);
+        draw_rectangle(slot.x, slot.y, slot.x + slot_size, slot.y + slot_size, true);
+        
+        // Название слота под слотом
+        draw_set_color(ui_text);
+        draw_set_halign(fa_center);
+        draw_text(slot.x + slot_size/2, slot.y + slot_size + 5, slot.name);
+        draw_set_halign(fa_left);
+        
+        // Если в слоте есть предмет, отображаем его
+        if (is_slot_filled) {
+            var item_data = ds_map_find_value(global.ItemDB, item_id);
+            if (item_data != -1) {
+                // Сокращенное название (максимум 2 строки)
+                var item_name = item_data[? "name"];
+                var max_chars_per_line = 8;
+                
+                // Разбиваем название на две строки если нужно
+                if (string_length(item_name) > max_chars_per_line) {
+                    var first_line = string_copy(item_name, 1, max_chars_per_line);
+                    var second_line = string_copy(item_name, max_chars_per_line + 1, max_chars_per_line);
+                    if (string_length(second_line) > max_chars_per_line - 2) {
+                        second_line = string_copy(second_line, 1, max_chars_per_line - 2) + "..";
+                    }
+                    item_name = first_line + "\n" + second_line;
+                }
+                
+                draw_set_color(ui_text);
                 draw_set_halign(fa_center);
                 draw_set_valign(fa_middle);
-                draw_text(slot_x + slot_size / 2, slot_y + slot_size / 2 - 8, inventory_get_item_icon(slot_item));
-
-                var item_name = inventory_source_get(slot_item, "name", "");
-                var short_name = string_copy(item_name, 1, 10);
-                draw_set_color(ui_text_secondary);
-                draw_set_font(fnt_small);
-                draw_text(slot_x + slot_size / 2, slot_y + slot_size - 12, short_name);
-                draw_set_font(fnt_main);
-                draw_set_valign(fa_top);
-
-                if (hovered) {
-                    inventory_register_tooltip(item_id, 1, "equipment");
+                draw_text(slot.x + slot_size/2, slot.y + slot_size/2 - 8, item_name);
+                
+                // Бонусы предмета (компактно внизу)
+                var bonus_text = "";
+                if (item_data[? "strength_bonus"] > 0) {
+                    bonus_text += "S:" + string(item_data[? "strength_bonus"]) + " ";
                 }
+                if (item_data[? "defense_bonus"] > 0) {
+                    bonus_text += "D:" + string(item_data[? "defense_bonus"]) + " ";
+                }
+                if (item_data[? "intelligence_bonus"] > 0) {
+                    bonus_text += "I:" + string(item_data[? "intelligence_bonus"]);
+                }
+                
+                if (bonus_text != "") {
+                    draw_set_font(fnt_small);
+                    draw_text(slot.x + slot_size/2, slot.y + slot_size - 15, bonus_text);
+                    draw_set_font(fnt_main);
+                }
+                
+                draw_set_halign(fa_left);
+                draw_set_valign(fa_top);
             }
         } else {
+            // Иконка пустого слота
             draw_set_color(ui_text_secondary);
             draw_set_halign(fa_center);
             draw_set_valign(fa_middle);
-            draw_text(slot_x + slot_size / 2, slot_y + slot_size / 2, "+");
+            draw_text(slot.x + slot_size/2, slot.y + slot_size/2, "+");
+            draw_set_halign(fa_left);
             draw_set_valign(fa_top);
         }
-
-        draw_set_color(ui_text);
-        draw_set_halign(fa_center);
-        draw_text(slot_x + slot_size / 2, slot_y + slot_size + 6, slot.name);
-        draw_set_halign(fa_left);
-
+        
+        // Добавляем кнопку слота для обработки кликов
         array_push(global.inv_buttons, {
             type: "equip_slot",
-            hero_index: 0,
+            hero_index: global.selected_hero_index,
             slot_type: slot.type,
-            x1: slot_x, y1: slot_y,
-            x2: slot_x + slot_size, y2: slot_y + slot_size
+            x1: slot.x, y1: slot.y,
+            x2: slot.x + slot_size, y2: slot.y + slot_size
         });
     }
-
-    var info_lines = [];
-    if (variable_global_exists("hero")) {
-        if (global.hero.equipment_bonuses.strength > 0) array_push(info_lines, "Сила +" + string(global.hero.equipment_bonuses.strength));
-        if (global.hero.equipment_bonuses.intelligence > 0) array_push(info_lines, "Интеллект +" + string(global.hero.equipment_bonuses.intelligence));
-        if (global.hero.equipment_bonuses.defense > 0) array_push(info_lines, "Защита +" + string(global.hero.equipment_bonuses.defense));
-    }
-
-    var bonus_y = grid_y + slot_size * 2 + slot_gap + 20;
+    
+    // Информация о выбранном персонаже
+    var info_y = slots_y + slot_size + 30;
     draw_set_color(ui_text_secondary);
     draw_set_halign(fa_center);
-
-    if (array_length(info_lines) > 0) {
-        var info_text = "";
-        for (var bi = 0; bi < array_length(info_lines); bi++) {
-            info_text += info_lines[bi];
-            if (bi < array_length(info_lines) - 1) info_text += "   ";
-        }
-        draw_text(x + width / 2, bonus_y, info_text);
-    } else {
-        draw_text(x + width / 2, bonus_y, "Пока нет бонусов от экипировки");
+    
+    var hero_name = "";
+    switch(global.selected_hero_index) {
+        case 0: hero_name = "Главный герой"; break;
+        case 1: hero_name = "Hepo"; break;
+        case 2: hero_name = "Fatty"; break;
+        case 3: hero_name = "Discipline"; break;
     }
+    
+    //draw_text(x + width/2, info_y - 5, hero_name);
+    
+    // Показываем текущие бонусы от экипировки
+    var bonus_info = "";
+    if (global.hero.equipment_bonuses.strength > 0) {
+        bonus_info += "Сила: +" + string(global.hero.equipment_bonuses.strength) + " ";
+    }
+    if (global.hero.equipment_bonuses.defense > 0) {
+        bonus_info += "Защита: +" + string(global.hero.equipment_bonuses.defense) + " ";
+    }
+    if (global.hero.equipment_bonuses.intelligence > 0) {
+        bonus_info += "Интеллект: +" + string(global.hero.equipment_bonuses.intelligence);
+    }
+    
+    if (bonus_info != "") {
+        draw_set_font(fnt_small);
+        draw_text(x + width/2, info_y + 115, bonus_info);
+        draw_set_font(fnt_main);
+    }
+    
     draw_set_halign(fa_left);
-
-    var set_y = bonus_y + 26;
-    draw_set_font(fnt_small);
-    draw_set_color(ui_text_secondary);
-
-    var has_sets = false;
-    if (variable_global_exists("hero") && is_struct(global.hero) && variable_struct_exists(global.hero, "active_sets")) {
-        var active_sets = global.hero.active_sets;
-        if (is_array(active_sets) && array_length(active_sets) > 0) {
-            has_sets = true;
-            for (var si = 0; si < array_length(active_sets); si++) {
-                var set_info = active_sets[si];
-                if (is_undefined(set_info)) continue;
-
-                var set_name = inventory_source_get(set_info, "name", "Неизвестный сет");
-                var owned = inventory_source_get(set_info, "owned", 0);
-                var total = max(1, inventory_source_get(set_info, "total", 1));
-
-                var header = set_name + " · " + string(owned) + "/" + string(total);
-                draw_set_color(owned >= total ? ui_highlight : ui_text_secondary);
-                draw_text(x + padding, set_y, header);
-                set_y += 16;
-
-                var unlocked = inventory_source_get(set_info, "unlocked", []);
-                if (is_array(unlocked)) {
-                    draw_set_color(ui_text_secondary);
-                    for (var ui_line = 0; ui_line < array_length(unlocked); ui_line++) {
-                        draw_text(x + padding + 12, set_y, "• " + string(unlocked[ui_line]));
-                        set_y += 14;
-                    }
-                }
-
-                var next_goal = inventory_source_get(set_info, "next", "");
-                if (next_goal != "") {
-                    draw_set_color(ui_text_secondary);
-                    draw_text(x + padding + 12, set_y, "Следующая цель: " + string(next_goal));
-                    set_y += 16;
-                }
-
-                set_y += 4;
-            }
-        }
-    }
-
-    if (!has_sets) {
-        draw_set_color(ui_text_secondary);
-        draw_text(x + padding, set_y, "Соберите предметы сетов для уникальных эффектов");
-    }
-
-    draw_set_font(fnt_main);
-    draw_set_halign(fa_left);
-    draw_set_valign(fa_top);
 }
 
 
-function inventory_source_has_key(db_data, key) {
-    if (is_undefined(db_data)) {
-        return false;
-    }
-
-    if (ds_exists(db_data, ds_type_map)) {
-        return ds_map_exists(db_data, key);
-    }
-
-    if (is_struct(db_data)) {
-        return variable_struct_exists(db_data, key);
-    }
-
-    return false;
-}
-
-function inventory_source_get(db_data, key, default_value) {
-    if (inventory_source_has_key(db_data, key)) {
-        if (ds_exists(db_data, ds_type_map)) {
-            return db_data[? key];
-        }
-        return variable_struct_get(db_data, key);
-    }
-
-    return default_value;
-}
-
-function inventory_fetch_item_definition(item_id) {
-    if (!is_real(item_id) || item_id < 0) {
-        return undefined;
-    }
-
-    if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) {
-        return undefined;
-    }
-
-    if (!ds_map_exists(global.ItemDB, item_id)) {
-        return undefined;
-    }
-
-    var entry = ds_map_find_value(global.ItemDB, item_id);
-    if (entry == -1) {
-        return undefined;
-    }
-
-    return entry;
-}
-
-function inventory_get_item_icon(db_data) {
-    var item_type = inventory_source_get(db_data, "type", -1);
-
-    switch(item_type) {
-        case global.ITEM_TYPE.WEAPON: return "⚔️";
-        case global.ITEM_TYPE.ARMOR: return "🛡️";
-        case global.ITEM_TYPE.ACCESSORY: return "💍";
-        case global.ITEM_TYPE.POTION: return "🧪";
-        case global.ITEM_TYPE.SCROLL: return "📜";
-        case global.ITEM_TYPE.RELIC: return "🗝️";
-        case global.ITEM_TYPE.RESOURCE: return "🪓";
-        case global.ITEM_TYPE.TROPHY: return "🏆";
-        default:
-            if (inventory_source_get(db_data, "item_class", "") == "trophy") return "🏆";
-            return "🎁";
-    }
-}
-
-function inventory_get_item_tag(db_data) {
-    var rarity_names = ["Обычный", "Необычный", "Редкий", "Эпический", "Легендарный"];
-    var rarity_value = inventory_source_get(db_data, "rarity", 0);
-
-    if (!is_real(rarity_value)) {
-        rarity_value = 0;
-    }
-
-    var rarity_index = clamp(floor(rarity_value), 0, array_length(rarity_names) - 1);
-
-    var set_id = inventory_source_get(db_data, "set_id", "");
-
-    if (set_id != "" && function_exists(get_set_definition)) {
-        var set_data = get_set_definition(set_id);
-        if (set_data != -1) {
-            return "Часть сета «" + set_data[? "name"] + "» · " + rarity_names[rarity_index];
-        }
-    }
-
-    var item_type = inventory_source_get(db_data, "type", -1);
-
-    switch(item_type) {
-        case global.ITEM_TYPE.WEAPON: return "Оружие · " + rarity_names[rarity_index];
-        case global.ITEM_TYPE.ARMOR: return "Броня · " + rarity_names[rarity_index];
-        case global.ITEM_TYPE.ACCESSORY: return "Аксессуар · " + rarity_names[rarity_index];
-        case global.ITEM_TYPE.POTION: return "Зелье · " + rarity_names[rarity_index];
-        case global.ITEM_TYPE.SCROLL: return "Свиток · " + rarity_names[rarity_index];
-	    case global.ITEM_TYPE.RELIC: return "Реликвия · " + rarity_names[rarity_index];
-        case global.ITEM_TYPE.RESOURCE: return "Ресурс · " + rarity_names[rarity_index];
-        case global.ITEM_TYPE.TROPHY: return "Трофей · Единственный";
-        default:
-            if (inventory_source_get(db_data, "item_class", "") == "trophy") return "Трофей · Единственный";
-            return "Артефакт · " + rarity_names[rarity_index];
-    }
-}
-
-function inventory_collect_item_stats(db_data) {
-    var segments = [];
-
-    var strength_bonus = inventory_source_get(db_data, "strength_bonus", 0);
-    if (strength_bonus != 0) array_push(segments, "⚔ +" + string(strength_bonus));
-
-    var agility_bonus = inventory_source_get(db_data, "agility_bonus", 0);
-    if (agility_bonus != 0) array_push(segments, "⚡ +" + string(agility_bonus));
-
-    var intelligence_bonus = inventory_source_get(db_data, "intelligence_bonus", 0);
-    if (intelligence_bonus != 0) array_push(segments, "🧠 +" + string(intelligence_bonus));
-
-    var defense_bonus = inventory_source_get(db_data, "defense_bonus", 0);
-    if (defense_bonus != 0) array_push(segments, "🛡 +" + string(defense_bonus));
-
-    var max_health_bonus = inventory_source_get(db_data, "max_health_bonus", 0);
-    if (max_health_bonus != 0) array_push(segments, "❤️ +" + string(max_health_bonus));
-
-    var health_bonus = inventory_source_get(db_data, "health_bonus", 0);
-    if (health_bonus != 0) array_push(segments, "🩸 +" + string(health_bonus));
-
-    var gold_bonus = inventory_source_get(db_data, "gold_bonus", 0);
-    if (gold_bonus != 0) array_push(segments, "💰 +" + string(gold_bonus) + "%");
-
-    var perm_strength = inventory_source_get(db_data, "perm_strength", 0);
-    if (perm_strength != 0) array_push(segments, "♾️⚔ +" + string(perm_strength));
-
-    var perm_agility = inventory_source_get(db_data, "perm_agility", 0);
-    if (perm_agility != 0) array_push(segments, "♾️⚡ +" + string(perm_agility));
-
-    var perm_intelligence = inventory_source_get(db_data, "perm_intelligence", 0);
-    if (perm_intelligence != 0) array_push(segments, "♾️🧠 +" + string(perm_intelligence));
-
-    return segments;
-}
-
-function inventory_collect_special_effects(db_data) {
-    var lines = [];
-    var highlight = variable_global_exists("ui_highlight") ? ui_highlight : c_aqua;
-    var accent = variable_global_exists("ui_accent") ? ui_accent : highlight;
-
-    var buff_type = inventory_source_get(db_data, "companion_buff", "");
-    if (buff_type != "") {
-        var details = inventory_source_get(db_data, "companion_buff_description", "");
-        if (details == "") {
-            var powerx = inventory_source_get(db_data, "buff_power", 0);
-            switch (buff_type) {
-                case "hepo_success":
-                    details = "🎯 +" + string(power) + "% к шансу успеха экспедиций.";
-                    break;
-                case "fatty_health":
-                    details = "🍰 +" + string(power) + "% к здоровью отряда.";
-                    break;
-                case "discipline_gold":
-                    details = "💰 +" + string(power) + "% к наградам экспедиций.";
-                    break;
-                case "all_buffs_boost":
-                    details = "✨ Усиление всех бафов помощниц на +" + string(power) + "%";
-                    break;
-                case "expedition_speed":
-                    details = "🧭 Сокращает длительность экспедиции на " + string(power) + "%";
-                    break;
-                case "double_rewards":
-                    details = "🎲 " + string(power) + "% шанс удвоить награды.";
-                    break;
-            }
-        }
-
-        if (details != "") {
-            array_push(lines, { text: details, color: highlight });
-        }
-    }
-
-    var heal = inventory_source_get(db_data, "health", 0);
-    if (heal > 0) {
-        array_push(lines, { text: "💖 Мгновенно лечит " + string(heal) + " здоровья.", color: accent });
-    }
-
-    var temp_strength = inventory_source_get(db_data, "temp_strength", 0);
-    if (temp_strength > 0) {
-        array_push(lines, { text: "💪 +" + string(temp_strength) + " силы на 30 секунд.", color: accent });
-    }
-
-    var temp_agility = inventory_source_get(db_data, "temp_agility", 0);
-    if (temp_agility > 0) {
-        array_push(lines, { text: "⚡ +" + string(temp_agility) + " ловкости на 30 секунд.", color: accent });
-    }
-
-    var temp_intelligence = inventory_source_get(db_data, "temp_intelligence", 0);
-    if (temp_intelligence > 0) {
-        array_push(lines, { text: "🧠 +" + string(temp_intelligence) + " интеллекта на 30 секунд.", color: accent });
-    }
-
-    var temp_defense = inventory_source_get(db_data, "temp_defense", 0);
-    if (temp_defense > 0) {
-        array_push(lines, { text: "🛡️ +" + string(temp_defense) + " защиты на 30 секунд.", color: accent });
-    }
-
-    var success_bonus = inventory_source_get(db_data, "expedition_success_bonus", 0);
-    if (success_bonus > 0) {
-        array_push(lines, { text: "🎯 +" + string(success_bonus) + "% к шансу успеха следующей экспедиции.", color: highlight });
-    }
-
-    var gold_bonus = inventory_source_get(db_data, "expedition_gold_bonus", 0);
-    if (gold_bonus > 0) {
-        array_push(lines, { text: "💰 +" + string(gold_bonus) + "% к наградам следующей экспедиции.", color: highlight });
-    }
-
-    if (inventory_source_get(db_data, "instant_complete", false)) {
-        array_push(lines, { text: "📜 Мгновенно завершает текущую экспедицию.", color: highlight });
-    }
-
-    var defense_mult = inventory_source_get(db_data, "defense_multiplier", 0);
-    if (defense_mult > 0) {
-        var def_percent = round((defense_mult - 1) * 100);
-        array_push(lines, { text: "🛡️ +" + string(def_percent) + "% к защите на одну экспедицию.", color: highlight });
-    }
-
-    var reward_mult = inventory_source_get(db_data, "reward_multiplier", 0);
-    if (reward_mult > 0) {
-        var reward_percent = round((reward_mult - 1) * 100);
-        array_push(lines, { text: "💎 +" + string(reward_percent) + "% к наградам следующей экспедиции.", color: highlight });
-    }
-
-    var speed_value = inventory_source_get(db_data, "expedition_speed", 0);
-    if (speed_value > 0) {
-        var speed_text = "⚡ Ускоряет экспедицию.";
-        var percent_value = 0;
-        if (speed_value < 1) {
-            percent_value = round((1 - speed_value) * 100);
-            speed_text = "⚡ Сокращает длительность экспедиции на " + string(percent_value) + "%";
-        } else {
-            percent_value = round(speed_value);
-            speed_text = "⚡ Ускоряет экспедицию на " + string(percent_value) + "%";
-        }
-        array_push(lines, { text: speed_text, color: highlight });
-    }
-
-    var trophy_condition = inventory_source_get(db_data, "trophy_condition", "");
-    if (trophy_condition != "") {
-        array_push(lines, { text: "Условие получения: " + trophy_condition, color: highlight });
-    }
-
-    return lines;
-}
-
-function inventory_get_set_progress_text(item_id, db_data) {
-    if (!function_exists(get_set_definition)) return "";
-    var set_id = db_data[? "set_id"];
-    if (is_undefined(set_id) || set_id == "") return "";
-
-    var set_data = get_set_definition(set_id);
-    if (set_data == -1) return "";
-
-    var total = array_length(set_data[? "pieces"]);
-    var equipped = function_exists(get_equipped_set_piece_count) ? get_equipped_set_piece_count(set_id) : 0;
-    var preview = equipped;
-    if (function_exists(is_item_equipped) && !is_item_equipped(item_id)) {
-        preview = min(total, equipped + 1);
-    }
-
-    var progress_text = set_data[? "name"] + " · " + string(equipped) + "/" + string(total);
-    if (preview > equipped && preview <= total) {
-        progress_text += " (→ " + string(preview) + ")";
-    }
-
-
-
-function inventory_register_tooltip(item_id, quantity, source) {
-    if (is_undefined(item_id)) return;
-
-    var tip = {
-        item_id: item_id,
-        quantity: max(1, quantity),
-        source: source,
-        anchor_x: mouse_x + 24,
-        anchor_y: mouse_y + 24
-    };
-
-    global.inventory_hover_tooltip = tip;
-}
-
-function draw_inventory_tooltip() {
-    if (!variable_global_exists("inventory_hover_tooltip")) return;
-    var tip = global.inventory_hover_tooltip;
-    if (!is_struct(tip)) return;
-
-    var item_id = tip.item_id;
-    if (is_undefined(item_id)) return;
-
-    if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) return;
-    var db_data = ds_map_find_value(global.ItemDB, item_id);
-    if (db_data == -1) return;
-
-    var width = 320;
-    var padding = 12;
-    var text_width = width - padding * 2;
-    var line_gap = 6;
-
-    var name = db_data[? "name"];
-    var tag_text = inventory_get_item_tag(db_data);
-    var description = db_data[? "description"];
-    if (is_undefined(description)) description = "";
-
-    var stats = inventory_collect_item_stats(db_data);
-    var stats_height = array_length(stats) > 0 ? 18 : 0;
-    var desc_height = string_length(description) > 0 ? string_height_ext(description, 4, text_width) : 0;
-
-    var special_lines = inventory_collect_special_effects(db_data);
-    var special_heights = [];
-    var special_height = 0;
-    for (var sl = 0; sl < array_length(special_lines); sl++) {
-        var entry = special_lines[sl];
-        var entry_text = entry.text;
-        var line_height = string_height_ext(entry_text, 4, text_width);
-        line_height = max(16, line_height);
-        array_push(special_heights, line_height);
-        special_height += line_height;
-    }
-
-    var piece_text = "";
-    if (!is_undefined(db_data[? "set_piece_name"]) && db_data[? "set_piece_name"] != "") {
-        piece_text = "Часть: " + db_data[? "set_piece_name"];
-    }
-
-    var set_lines = [];
-    if (function_exists(get_set_definition)) {
-        var set_id = db_data[? "set_id"];
-        if (!is_undefined(set_id) && set_id != "") {
-            var set_data = get_set_definition(set_id);
-            if (set_data != -1) {
-                var total = array_length(set_data[? "pieces"]);
-                var equipped = function_exists(get_equipped_set_piece_count) ? get_equipped_set_piece_count(set_id) : 0;
-                var preview = equipped;
-                if (function_exists(is_item_equipped) && !is_item_equipped(item_id)) {
-                    preview = min(total, equipped + 1);
-                }
-
-                var header = set_data[? "name"] + " · " + string(equipped) + "/" + string(total);
-                if (preview > equipped && preview <= total) {
-                    header += " (→ " + string(preview) + ")";
-                }
-                array_push(set_lines, { text: header, color: ui_highlight });
-
-                var bonuses = set_data[? "bonuses"];
-                for (var b = 0; b < array_length(bonuses); b++) {
-                    var entry = bonuses[b];
-                    var bonus_text = string(entry.count) + " предмета: " + entry.description;
-                    var unlocked = (equipped >= entry.count);
-                    var upcoming = (!unlocked && preview >= entry.count);
-                    var line_color = unlocked ? ui_text : (upcoming ? ui_highlight : ui_text_secondary);
-                    array_push(set_lines, { text: bonus_text, color: line_color });
-                }
-
-                var set_desc = set_data[? "description"];
-                if (!is_undefined(set_desc) && string_length(set_desc) > 0) {
-                    array_push(set_lines, { text: set_desc, color: ui_text_secondary });
-                }
-            }
-        }
-    }
-
-    var set_height = array_length(set_lines) * 16;
-
-    var trophy_text = "";
-    if (db_data[? "type"] == global.ITEM_TYPE.TROPHY || db_data[? "item_class"] == "trophy") {
-        trophy_text = db_data[? "trophy_condition"];
-        if ((is_undefined(trophy_text) || trophy_text == "") && function_exists(get_trophy_definition)) {
-            var trophy_data = get_trophy_definition(item_id);
-            if (trophy_data != undefined) {
-                trophy_text = trophy_data.condition;
-            }
-        }
-        if (is_undefined(trophy_text)) trophy_text = "";
-    }
-    var trophy_height = trophy_text != "" ? string_height_ext(trophy_text, 4, text_width) : 0;
-
-    var quantity_text = "";
-    if (db_data[? "stackable"]) {
-        quantity_text = "В стопке: " + string(tip.quantity);
-    }
-
-    var total_height = padding * 2 + 24 + 18;
-    if (stats_height > 0) total_height += line_gap + stats_height;
-    if (desc_height > 0) total_height += line_gap + desc_height;
-    if (special_height > 0) total_height += line_gap + special_height;
-    if (piece_text != "") total_height += line_gap + 16;
-    if (set_height > 0) total_height += line_gap + set_height;
-    if (trophy_height > 0) total_height += line_gap + trophy_height;
-    if (quantity_text != "") total_height += line_gap + 16;
-
-    var screen_w = variable_global_exists("screen_width") ? global.screen_width : display_get_gui_width();
-    var screen_h = variable_global_exists("screen_height") ? global.screen_height : display_get_gui_height();
-
-    var final_x = tip.anchor_x;
-    var final_y = tip.anchor_y;
-
-    if (final_x + width > screen_w - 12) final_x = screen_w - width - 12;
-    if (final_y + total_height > screen_h - 12) final_y = screen_h - total_height - 12;
-    final_x = max(12, final_x);
-    final_y = max(12, final_y);
-
-    var rarity_color = inventory_get_rarity_color(db_data[? "rarity"]);
-
-    draw_set_color(ui_bg_dark);
-    draw_rectangle(final_x, final_y, final_x + width, final_y + total_height, false);
-    draw_set_color(rarity_color);
-    draw_rectangle(final_x, final_y, final_x + width, final_y + 4, false);
-    draw_set_color(ui_border_color);
-    draw_rectangle(final_x, final_y, final_x + width, final_y + total_height, true);
-
-    var cursor_y = final_y + padding;
-    draw_set_color(c_white);
-    draw_set_halign(fa_left);
-    draw_set_font(fnt_main);
-    draw_text(final_x + padding, cursor_y, name);
-    cursor_y += 24;
-
-    draw_set_font(fnt_small);
-    draw_set_color(ui_text_secondary);
-    draw_text(final_x + padding, cursor_y, tag_text);
-    cursor_y += 18;
-
-    if (array_length(stats) > 0) {
-        cursor_y += line_gap;
-        draw_set_color(ui_text);
-        draw_text(final_x + padding, cursor_y, array_join(stats, "   "));
-        cursor_y += 18;
-    }
-
-    if (desc_height > 0) {
-        cursor_y += line_gap;
-        draw_set_color(ui_text_secondary);
-         draw_text_ext(final_x + padding, cursor_y, description, 4, text_width);
-        cursor_y += desc_height;
-    }
-
-    if (special_height > 0) {
-        cursor_y += line_gap;
-        for (var sl = 0; sl < array_length(special_lines); sl++) {
-            var entry = special_lines[sl];
-            var entry_color = variable_struct_exists(entry, "color") ? entry.color : ui_highlight;
-            draw_set_color(entry_color);
-            draw_text_ext(final_x + padding, cursor_y, entry.text, 4, text_width);
-            cursor_y += special_heights[sl];
-        }
-    }
-
-    if (piece_text != "") {
-        cursor_y += line_gap;
-        draw_set_color(ui_text_secondary);
-        draw_text(final_x + padding, cursor_y, piece_text);
-        cursor_y += 16;
-    }
-
-    if (set_height > 0) {
-        cursor_y += line_gap;
-        for (var sl = 0; sl < array_length(set_lines); sl++) {
-            var line = set_lines[sl];
-            draw_set_color(line.color);
-            draw_text(final_x + padding, cursor_y, line.text);
-            cursor_y += 16;
-        }
-    }
-
-    if (trophy_height > 0) {
-        cursor_y += line_gap;
-        draw_set_color(ui_highlight);
-        draw_text_ext(final_x + padding, cursor_y, trophy_text, 4, text_width);
-        cursor_y += trophy_height;
-    }
-
-    if (quantity_text != "") {
-        cursor_y += line_gap;
-        draw_set_color(ui_text_secondary);
-        draw_text(final_x + padding, cursor_y, quantity_text);
-    }
-
-    draw_set_font(fnt_main);
-    draw_set_color(c_white);
-}
 
 function draw_shop_tab(x, y, width, height) {
     // Проверяем существование необходимых переменных
@@ -1426,149 +1050,131 @@ function draw_shop_tab(x, y, width, height) {
 }
 
 
-
-function draw_trophies_tab(x, y, width, height) {
-    if (!variable_global_exists("trophy_buttons")) global.trophy_buttons = [];
-    if (!variable_global_exists("trophy_showcase_buttons")) global.trophy_showcase_buttons = [];
-    global.trophy_buttons = [];
-    global.trophy_showcase_buttons = [];
-
+function draw_companions_tab(x, y, width, height) {
     draw_set_color(ui_text);
-    draw_text(x, y, "ЗАЛ ТРОФЕЕВ");
-
-    var showcase_y = y + 30;
-    var showcase_height = 120;
-    var slot_gap = 18;
-    var slot_width = (width - slot_gap * 2) / 3;
-
-    draw_set_color(ui_text_secondary);
-    draw_text(x, showcase_y - 18, "Избранные трофеи украшают вашу витрину");
-
-    for (var i = 0; i < 3; i++) {
-        var slot_x = x + i * (slot_width + slot_gap);
-        var slot_y = showcase_y;
-        var trophy_id = global.featured_trophies[i];
-        var has_trophy = (trophy_id != "" && is_trophy_unlocked(trophy_id));
-        var base_color = has_trophy ? merge_color(ui_highlight, c_white, 0.18) : merge_color(ui_bg_dark, c_white, 0.12);
-        var border_color = has_trophy ? ui_highlight : ui_border_color;
-
-        draw_set_color(base_color);
-        draw_rectangle(slot_x, slot_y, slot_x + slot_width, slot_y + showcase_height, false);
-        draw_set_color(border_color);
-        draw_rectangle(slot_x, slot_y, slot_x + slot_width, slot_y + showcase_height, true);
-
-        draw_set_halign(fa_center);
-        if (has_trophy) {
-            var trophy_data = get_trophy_definition(trophy_id);
-            draw_set_color(c_white);
-            draw_set_font(fnt_main);
-            draw_text(slot_x + slot_width/2, slot_y + 24, trophy_data.icon);
+    draw_text(x, y, "СИСТЕМА РАНГОВ ПОМОЩНИЦ");
+    
+    global.companion_rank_buttons = [];
+    var companion_height = 110;
+    var start_y = y + 30;
+    var displayed_count = 0;
+    
+    for (var i = 0; i < array_length(global.companions); i++) {
+        var companion = global.companions[i];
+        
+        // Показываем только разблокированных помощниц
+        if (!companion.unlocked) {
+            continue;
+        }
+        
+        var companion_y = start_y + displayed_count * companion_height;
+        displayed_count++;
+        
+        draw_set_color(ui_bg_medium);
+        draw_rectangle(x, companion_y, x + width, companion_y + 110, false);
+        
+        // Цветная полоса
+        draw_set_color(companion_colors[i]);
+        draw_rectangle(x, companion_y, x + 5, companion_y + 110, false);
+        
+        // Информация о помощнице
+        draw_set_color(ui_text);
+        draw_text(x + 15, companion_y + 10, companion.name);
+        draw_text(x + 15, companion_y + 30, "Уровень: " + string(companion.level));
+        draw_text(x + 15, companion_y + 50, "Ранг: " + string(companion.rank) + "/" + string(companion.max_rank));
+        
+        // Эффект помощницы (учитывает текущий ранг)
+        var current_rank_effect = "";
+        if (companion.rank >= 0 && companion.rank < array_length(companion.rank_effects)) {
+            current_rank_effect = companion.rank_effects[companion.rank];
+        } else {
+            // Если ранг вышел за границы, показываем последний доступный эффект
+            var last_index = array_length(companion.rank_effects) - 1;
+            current_rank_effect = companion.rank_effects[last_index];
+        }
+        draw_set_color(ui_text_secondary);
+        draw_text(x + 15, companion_y + 70, current_rank_effect);
+        
+        // Прогресс до следующего ранга
+        var progress = get_rank_progress(i);
+        if (companion.rank < companion.max_rank) {
             draw_set_color(ui_text);
-            draw_text(slot_x + slot_width/2, slot_y + 60, trophy_data.name);
-            draw_set_color(ui_text_secondary);
-            draw_set_font(fnt_small);
-            draw_text(slot_x + slot_width/2, slot_y + 88, "Витрина украшена");
-            draw_set_font(fnt_main);
-
-            var btn_x1 = slot_x + slot_width - 26;
-            var btn_y1 = slot_y + 6;
-            var btn_x2 = btn_x1 + 20;
-            var btn_y2 = btn_y1 + 20;
-            draw_set_color(ui_danger);
-            draw_rectangle(btn_x1, btn_y1, btn_x2, btn_y2, false);
-            draw_set_color(c_white);
-            draw_text((btn_x1 + btn_x2)/2, btn_y1 + 2, "✕");
-
-            array_push(global.trophy_showcase_buttons, {
-                type: "clear_feature_slot",
-                slot: i,
-                x1: btn_x1, y1: btn_y1,
-                x2: btn_x2, y2: btn_y2
+            draw_text(x + width - 200, companion_y + 10, "Следующий ранг: ур. " + string(progress.required));
+            
+            // Прогресс-бар уровня
+            var bar_width = 150;
+            var bar_x = x + width - 200;
+            var bar_y = companion_y + 30;
+            
+            draw_set_color(ui_bg_dark);
+            draw_rectangle(bar_x, bar_y, bar_x + bar_width, bar_y + 10, false);
+            draw_set_color(ui_highlight);
+            draw_rectangle(bar_x, bar_y, bar_x + bar_width * (progress.percent / 100), bar_y + 10, false);
+            draw_set_color(ui_border_color);
+            draw_rectangle(bar_x, bar_y, bar_x + bar_width, bar_y + 10, true);
+            
+            draw_set_color(ui_text);
+            draw_text(bar_x + bar_width + 5, bar_y, string(progress.current) + "/" + string(progress.required));
+            
+            // Кнопка повышения ранга
+            var btn_x = x + width - 200;
+            var btn_y = companion_y + 50;
+            var btn_width = 180;
+            var btn_height = 25;
+            
+            var cost = get_rank_upgrade_cost(i);
+            var can_afford = global.gold >= cost;
+            var btn_color = can_afford ? ui_success_color : ui_danger;
+            
+            // Проверка наведения мыши
+            var mouse_over = point_in_rectangle(mouse_x, mouse_y, btn_x, btn_y, btn_x + btn_width, btn_y + btn_height);
+            if (mouse_over) {
+                btn_color = merge_color(btn_color, c_white, 0.2);
+            }
+            
+            // Фон кнопки
+            draw_set_color(btn_color);
+            draw_rectangle(btn_x, btn_y, btn_x + btn_width, btn_y + btn_height, false);
+            
+            // Рамка кнопки
+            draw_set_color(ui_border_color);
+            draw_rectangle(btn_x, btn_y, btn_x + btn_width, btn_y + btn_height, true);
+            
+            // Текст кнопки
+            draw_set_color(ui_text);
+            draw_set_halign(fa_center);
+            draw_text(btn_x + btn_width/2, btn_y + btn_height/2, "Повысить ранг (" + string(cost) + "g)");
+            draw_set_halign(fa_left);
+            
+            // Добавляем кнопку в массив
+            array_push(global.companion_rank_buttons, {
+                companion_index: i,
+                x1: btn_x, y1: btn_y,
+                x2: btn_x + btn_width, y2: btn_y + btn_height
             });
         } else {
-            draw_set_color(ui_text_secondary);
-            draw_set_font(fnt_small);
-            draw_text(slot_x + slot_width/2, slot_y + 60, "Выберите трофей из списка");
-            draw_set_font(fnt_main);
+            draw_set_color(ui_success_color);
+            draw_text(x + width - 200, companion_y + 10, "Максимальный ранг достигнут!");
         }
-        draw_set_halign(fa_left);
-    }
-
-    var list_y = showcase_y + showcase_height + 28;
-    var card_gap = 16;
-    var card_height = 110;
-    var columns = max(1, floor(width / 320));
-    var card_width = (width - card_gap * (columns - 1)) / columns;
-
-    for (var t = 0; t < array_length(global.trophy_catalog); t++) {
-        var trophy = global.trophy_catalog[t];
-        var column = t mod columns;
-        var row = t div columns;
-        var card_x = x + column * (card_width + card_gap);
-        var card_y = list_y + row * (card_height + card_gap);
-
-        var unlocked = is_trophy_unlocked(trophy.id);
-        var featured = false;
-        for (var f = 0; f < array_length(global.featured_trophies); f++) {
-            if (global.featured_trophies[f] == trophy.id) {
-                featured = true;
-                break;
+        
+        // Информация о следующем эффекте
+        if (companion.rank < companion.max_rank) {
+            var next_rank = companion.rank + 1;
+            if (next_rank >= 0 && next_rank < array_length(companion.rank_effects)) {
+                draw_set_color(ui_text_secondary);
+                draw_text(x + 15, companion_y + 90, "Следующий ранг: " + companion.rank_effects[next_rank]);
             }
         }
-
-        var card_color = unlocked ? merge_color(ui_bg_light, c_white, featured ? 0.25 : 0.12) : merge_color(ui_bg_dark, c_white, 0.08);
-        var card_border = unlocked ? (featured ? ui_highlight : ui_border_color) : ui_border_color;
-
-        draw_set_color(card_color);
-        draw_rectangle(card_x, card_y, card_x + card_width, card_y + card_height, false);
-        draw_set_color(card_border);
-        draw_rectangle(card_x, card_y, card_x + card_width, card_y + card_height, true);
-
-        draw_set_color(c_white);
-        draw_set_halign(fa_left);
-        draw_text(card_x + 16, card_y + 14, trophy.icon);
-        draw_set_color(ui_text);
-        draw_text(card_x + 48, card_y + 12, trophy.name);
-        draw_set_color(ui_text_secondary);
-        draw_set_font(fnt_small);
-        draw_text(card_x + 48, card_y + 32, trophy.condition);
-        draw_set_font(fnt_main);
-
-        if (unlocked) {
-            draw_set_color(ui_text_secondary);
-            draw_text(card_x + 48, card_y + 52, featured ? "На витрине" : "Готов к размещению");
-
-            var btn_x1 = card_x + 48;
-            var btn_y1 = card_y + card_height - 28;
-            var btn_x2 = card_x + card_width - 16;
-            var btn_y2 = btn_y1 + 20;
-            draw_set_color(featured ? ui_danger : ui_highlight);
-            draw_rectangle(btn_x1, btn_y1, btn_x2, btn_y2, false);
-            draw_set_color(c_white);
-            draw_set_halign(fa_center);
-            draw_text((btn_x1 + btn_x2)/2, btn_y1 + 4, featured ? "Убрать из витрины" : "Добавить в витрину");
-            draw_set_halign(fa_left);
-
-            array_push(global.trophy_buttons, {
-                type: "feature_trophy",
-                trophy_id: trophy.id,
-                x1: btn_x1, y1: btn_y1,
-                x2: btn_x2, y2: btn_y2
-            });
-        } else {
-            draw_set_color(ui_text_secondary);
-            draw_text(card_x + 48, card_y + card_height - 28, "Требуется выполнить условие");
-        }
     }
-
-    if (array_length(global.trophy_catalog) == 0) {
+    
+    // Если нет разблокированных помощниц
+    if (displayed_count == 0) {
         draw_set_color(ui_text_secondary);
         draw_set_halign(fa_center);
-        draw_text(x + width/2, list_y + 40, "Трофеи ещё не добавлены");
+        draw_text(x + width/2, y + height/2, "Помощницы будут разблокированы после прохождения экспедиций");
         draw_set_halign(fa_left);
     }
 }
-
 // scr_draw_tabs.gml - добавьте эту функцию
 
 function handle_inventory_tab_click(mouse_x, mouse_y) {
@@ -1577,6 +1183,11 @@ function handle_inventory_tab_click(mouse_x, mouse_y) {
         var btn = global.inv_buttons[i];
         if (point_in_rectangle(mouse_x, mouse_y, btn.x1, btn.y1, btn.x2, btn.y2)) {
             switch (btn.type) {
+                case "hero_tab":
+                    global.selected_hero_index = btn.index;
+                    add_notification("Выбран: " + get_hero_name(btn.index));
+                    return true;
+                    
                 case "inventory_equip":
                     // Экипировка предмета
                     equip_item_from_inventory(btn.cell_index);
@@ -1600,5 +1211,4 @@ function handle_inventory_tab_click(mouse_x, mouse_y) {
         }
     }
     return false;
-}
 }

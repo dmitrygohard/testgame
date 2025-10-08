@@ -1159,6 +1159,128 @@ function draw_modern_shop_button(x, y, width, height, item_data, price, can_affo
     draw_set_valign(fa_top);
 }
 function draw_companions_tab(x, y, width, height) {
-    draw_trophies_tab(x, y, width, height);
+    draw_set_color(ui_text);
+    draw_text(x, y, "СИСТЕМА РАНГОВ ПОМОЩНИЦ");
+    
+    global.companion_rank_buttons = [];
+    var companion_height = 110;
+    var start_y = y + 30;
+    var displayed_count = 0;
+    
+    for (var i = 0; i < array_length(global.companions); i++) {
+        var companion = global.companions[i];
+        
+        // Показываем только разблокированных помощниц
+        if (!companion.unlocked) {
+            continue;
+        }
+        
+        var companion_y = start_y + displayed_count * companion_height;
+        displayed_count++;
+        
+        draw_set_color(ui_bg_medium);
+        draw_rectangle(x, companion_y, x + width, companion_y + 110, false);
+        
+        // Цветная полоса
+        draw_set_color(companion_colors[i]);
+        draw_rectangle(x, companion_y, x + 5, companion_y + 110, false);
+        
+        // Информация о помощнице
+        draw_set_color(ui_text);
+        draw_text(x + 15, companion_y + 10, companion.name);
+        draw_text(x + 15, companion_y + 30, "Уровень: " + string(companion.level));
+        draw_text(x + 15, companion_y + 50, "Ранг: " + string(companion.rank) + "/" + string(companion.max_rank));
+        
+        // Эффект помощницы (учитывает текущий ранг) - ЗАЩИТА ОТ ВЫХОДА ЗА ГРАНИЦЫ МАССИВА
+        var current_rank_effect = "";
+        if (companion.rank >= 0 && companion.rank < array_length(companion.rank_effects)) {
+            current_rank_effect = companion.rank_effects[companion.rank];
+        } else {
+            // Если ранг вышел за границы, показываем последний доступный эффект
+            var last_index = array_length(companion.rank_effects) - 1;
+            current_rank_effect = companion.rank_effects[last_index];
+        }
+        draw_set_color(ui_text_secondary);
+        draw_text(x + 15, companion_y + 70, current_rank_effect);
+        
+        // Прогресс до следующего ранга
+        var progress = get_rank_progress(i);
+        if (companion.rank < companion.max_rank) {
+            draw_set_color(ui_text);
+            draw_text(x + width - 200, companion_y + 10, "Следующий ранг: ур. " + string(progress.required));
+            
+            // Прогресс-бар уровня
+            var bar_width = 150;
+            var bar_x = x + width - 200;
+            var bar_y = companion_y + 30;
+            
+            draw_set_color(ui_bg_dark);
+            draw_rectangle(bar_x, bar_y, bar_x + bar_width, bar_y + 10, false);
+            draw_set_color(ui_highlight);
+            draw_rectangle(bar_x, bar_y, bar_x + bar_width * (progress.percent / 100), bar_y + 10, false);
+            draw_set_color(ui_border_color);
+            draw_rectangle(bar_x, bar_y, bar_x + bar_width, bar_y + 10, true);
+            
+            draw_set_color(ui_text);
+            draw_text(bar_x + bar_width + 5, bar_y, string(progress.current) + "/" + string(progress.required));
+            
+            // Кнопка повышения ранга
+            var btn_x = x + width - 200;
+            var btn_y = companion_y + 50;
+            var btn_width = 180;
+            var btn_height = 25;
+            
+            var cost = get_rank_upgrade_cost(i);
+            var can_afford = global.gold >= cost;
+            var btn_color = can_afford ? ui_success_color : ui_danger;
+            
+            // Проверка наведения мыши
+            var mouse_over = point_in_rectangle(mouse_x, mouse_y, btn_x, btn_y, btn_x + btn_width, btn_y + btn_height);
+            if (mouse_over) {
+                btn_color = merge_color(btn_color, c_white, 0.2);
+            }
+            
+            // Фон кнопки
+            draw_set_color(btn_color);
+            draw_rectangle(btn_x, btn_y, btn_x + btn_width, btn_y + btn_height, false);
+            
+            // Рамка кнопки
+            draw_set_color(ui_border_color);
+            draw_rectangle(btn_x, btn_y, btn_x + btn_width, btn_y + btn_height, true);
+            
+            // Текст кнопки
+            draw_set_color(ui_text);
+            draw_set_halign(fa_center);
+            draw_text(btn_x + btn_width/2, btn_y + btn_height/2, "Повысить ранг (" + string(cost) + "g)");
+            draw_set_halign(fa_left);
+            
+            // Добавляем кнопку в массив
+            array_push(global.companion_rank_buttons, {
+                companion_index: i,
+                x1: btn_x, y1: btn_y,
+                x2: btn_x + btn_width, y2: btn_y + btn_height
+            });
+        } else {
+            draw_set_color(ui_success_color);
+            draw_text(x + width - 200, companion_y + 10, "Максимальный ранг достигнут!");
+        }
+        
+        // Информация о следующем эффекте - ЗАЩИТА ОТ ВЫХОДА ЗА ГРАНИЦЫ МАССИВА
+        if (companion.rank < companion.max_rank) {
+            var next_rank = companion.rank + 1;
+            if (next_rank >= 0 && next_rank < array_length(companion.rank_effects)) {
+                draw_set_color(ui_text_secondary);
+                draw_text(x + 15, companion_y + 90, "Следующий ранг: " + companion.rank_effects[next_rank]);
+            }
+        }
+    }
+    
+    // Если нет разблокированных помощниц
+    if (displayed_count == 0) {
+        draw_set_color(ui_text_secondary);
+        draw_set_halign(fa_center);
+        draw_text(x + width/2, y + height/2, "Помощницы будут разблокированы после прохождения экспедиций");
+        draw_set_halign(fa_left);
+    }
 }
 }

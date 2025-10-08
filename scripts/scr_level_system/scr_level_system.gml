@@ -292,25 +292,20 @@ function sell_item_direct(item_index, quantity) {
     
     var item_id = item_data[? "id"];
     var current_quantity = item_data[? "quantity"];
-
+    
     // Проверяем количество
     if (quantity > current_quantity) {
         add_notification("Недостаточно предметов для продажи!");
         return false;
     }
-
+    
     // Получаем данные из базы
     var db_data = ds_map_find_value(global.ItemDB, item_id);
     if (db_data == -1) {
         show_debug_message("Ошибка: предмет не найден в базе данных");
         return false;
     }
-
-    if (db_data[? "item_class"] == "trophy" || db_data[? "type"] == global.ITEM_TYPE.TROPHY) {
-        add_notification("Трофеи слишком ценны, чтобы их продавать!");
-        return false;
-    }
-
+    
     var item_name = db_data[? "name"];
     var base_price = db_data[? "price"];
     var sell_price = floor(base_price * 0.5 * quantity);
@@ -329,11 +324,7 @@ function sell_item_direct(item_index, quantity) {
     
     // Добавляем золото
     global.gold += sell_price;
-
-    if (function_exists(check_gold_trophies)) {
-        check_gold_trophies();
-    }
-
+    
     // Создаем эффект продажи
     create_sell_effect(item_index, sell_price);
     
