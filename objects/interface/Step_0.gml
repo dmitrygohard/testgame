@@ -227,26 +227,18 @@ if (mouse_check_button_pressed(mb_left)) {
         }
     }
     
-    // Обработка кликов в разделе трофеев
+    // Обработка кликов в разделе помощниц
     if (!click_handled && active_tab == 4) {
-        if (variable_global_exists("trophy_showcase_buttons")) {
-            for (var i = 0; i < array_length(global.trophy_showcase_buttons); i++) {
-                var btn = global.trophy_showcase_buttons[i];
+        // Обработка повышения ранга помощниц
+        if (variable_global_exists("companion_rank_buttons") && array_length(global.companion_rank_buttons) > 0) {
+            for (var i = 0; i < array_length(global.companion_rank_buttons); i++) {
+                var btn = global.companion_rank_buttons[i];
                 if (point_in_rectangle(mouse_x, mouse_y, btn.x1, btn.y1, btn.x2, btn.y2)) {
-                    clear_featured_slot(btn.slot);
-                    click_handled = true;
-                    break;
-                }
-            }
-        }
-
-        if (!click_handled && variable_global_exists("trophy_buttons")) {
-            for (var i = 0; i < array_length(global.trophy_buttons); i++) {
-                var btn = global.trophy_buttons[i];
-                if (point_in_rectangle(mouse_x, mouse_y, btn.x1, btn.y1, btn.x2, btn.y2)) {
-                    toggle_featured_trophy(btn.trophy_id);
-                    click_handled = true;
-                    break;
+                    if (upgrade_companion_rank(btn.companion_index)) {
+                        // Ранг успешно повышен
+                        click_handled = true;
+                        break;
+                    }
                 }
             }
         }
@@ -262,7 +254,14 @@ if (mouse_check_button_pressed(mb_left)) {
             if (point_in_rectangle(mouse_x, mouse_y, btn.x1, btn.y1, btn.x2, btn.y2)) {
                 show_debug_message("Клик на кнопку типа: " + btn.type);
                 
-                if (btn.type == "equip_slot") {
+                if (btn.type == "hero_tab") {
+                    // Переключение между героями - ВАЖНОЕ ИСПРАВЛЕНИЕ
+                    global.selected_hero_index = btn.index;
+                    add_notification("Выбран: " + get_hero_name(global.selected_hero_index));
+                    show_debug_message("Переключен на героя: " + string(global.selected_hero_index));
+                    click_handled = true;
+                    break;
+                } else if (btn.type == "equip_slot") {
                     // Снятие предмета с экипировки
                     var slot_struct = global.equipment_slots[btn.hero_index];
                     var slot_item_id = variable_struct_get(slot_struct, btn.slot_type);
