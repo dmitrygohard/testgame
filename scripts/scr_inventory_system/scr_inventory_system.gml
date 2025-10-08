@@ -383,35 +383,49 @@ function EquipItem(item_index, character_index, slot_type) {
 }
 
 function UnequipItem(_character_index, _slot_type) {
+    // Проверяем, инициализирован ли массив слотов экипировки
     if (!variable_global_exists("equipment_slots")) {
         show_debug_message("Ошибка: equipment_slots не инициализирован!");
         return false;
     }
-	
-    var total_slots = array_length(global.equipment_slots);
+
+    var slots_array = global.equipment_slots;
+    if (!is_array(slots_array)) {
+        show_debug_message("Ошибка: структура слотов экипировки повреждена.");
+        return false;
+    }
+
+    var total_slots = array_length(slots_array);
     if (_character_index < 0 || _character_index >= total_slots) {
         show_debug_message("Ошибка: индекс персонажа вне диапазона при снятии предмета.");
         return false;
     }
-	
-    var slot_struct = global.equipment_slots[_character_index];
+
+    var slot_struct = slots_array[_character_index];
     if (!is_struct(slot_struct) || !variable_struct_exists(slot_struct, _slot_type)) {
         show_debug_message("Ошибка: указанный слот экипировки не найден.");
         return false;
     }
-	
+
     var item_id = variable_struct_get(slot_struct, _slot_type);
-    if (is_undefined(item_id) || item_id == -1) {
+    if (is_undefined(item_id) || item_id < 0) {
+        // В слоте нет предмета — нечего снимать
         return false;
     }
-	
+
     if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) {
         show_debug_message("Ошибка: база данных предметов не инициализирована.");
         return false;
     }
 
+    if (!ds_map_exists(global.ItemDB, item_id)) {
+        show_debug_message("Ошибка: предмет с ID " + string(item_id) + " не найден в базе данных.");
+        return false;
+    }
+
     var item_data = ds_map_find_value(global.ItemDB, item_id);
-    if (item_data == -1) {show_debug_message("Ошибка: предмет с ID " + string(item_id) + " не найден в базе данных.");
+    if (!ds_exists(item_data, ds_type_map)) {
+        show_debug_message("Ошибка: данные предмета " + string(item_id) + " повреждены.");
         return false;
     }
 
@@ -422,6 +436,7 @@ function UnequipItem(_character_index, _slot_type) {
 
     ensure_equipment_bonus_defaults();
 
+    // Удаляем временные бонусы статов
     var strength_bonus = item_data[? "strength_bonus"];
     if (!is_undefined(strength_bonus)) {
         global.hero.equipment_bonuses.strength = global.hero.equipment_bonuses.strength - strength_bonus;
@@ -457,6 +472,7 @@ function UnequipItem(_character_index, _slot_type) {
         global.hero.equipment_bonuses.health_bonus = global.hero.equipment_bonuses.health_bonus - health_bonus;
     }
 
+    // Перманентные бонусы немедленно вычитаются из героя
     var perm_strength = item_data[? "perm_strength"];
     if (!is_undefined(perm_strength)) {
         global.hero.equipment_bonuses.perm_strength = global.hero.equipment_bonuses.perm_strength - perm_strength;
@@ -475,10 +491,14 @@ function UnequipItem(_character_index, _slot_type) {
         global.hero.intelligence = global.hero.intelligence - perm_intelligence;
     }
 
-    remove_artifact_effects(item_id);
+    if (function_exists(remove_artifact_effects)) {
+        remove_artifact_effects(item_id);
+    }
 
+    // Очищаем слот
     variable_struct_set(slot_struct, _slot_type, -1);
 
+    // Возвращаем предмет в инвентарь
     if (!AddItemToInventory(item_id, 1)) {
         show_debug_message("Предупреждение: не удалось вернуть предмет в инвентарь после снятия.");
     }
@@ -498,7 +518,7 @@ function UnequipItem(_character_index, _slot_type) {
     }
 
     var item_name = item_data[? "name"];
-    if (is_undefined(item_name)) {
+    if (is_undefined(item_name) || item_name == "") {
         item_name = "Предмет";
     }
 
@@ -506,6 +526,7 @@ function UnequipItem(_character_index, _slot_type) {
 
     return true;
 }
+
 
 function RemoveItemFromInventory(_itemId, _quantity) {
     // Проверяем, существует ли инвентарь игрока
