@@ -161,28 +161,13 @@ function draw_expedition_confirmation() {
 
 // Обновляем функцию AddItemToDB для поддержки новых свойств
 function AddItemToDBExtended(_id, _name, _type, _price, _desc, _str_bonus, _int_bonus, _def_bonus, _equip_slot, _rarity, _stackable = false, _maxStack = 1, _gold_bonus = 0, _agi_bonus = 0, _health_bonus = 0, _perm_str = 0, _perm_int = 0, _perm_agi = 0) {
-    var item = ds_map_create();
-    
-    ds_map_add(item, "id", _id);
-    ds_map_add(item, "name", _name);
-    ds_map_add(item, "type", _type);
-    ds_map_add(item, "price", _price);
-    ds_map_add(item, "description", _desc);
-    ds_map_add(item, "strength_bonus", _str_bonus);
-    ds_map_add(item, "intelligence_bonus", _int_bonus);
-    ds_map_add(item, "defense_bonus", _def_bonus);
-    ds_map_add(item, "equip_slot", _equip_slot);
-    ds_map_add(item, "rarity", _rarity);
-    ds_map_add(item, "stackable", _stackable);
-    ds_map_add(item, "maxStack", _maxStack);
-    ds_map_add(item, "gold_bonus", _gold_bonus);
-    ds_map_add(item, "agility_bonus", _agi_bonus);
-    ds_map_add(item, "health_bonus", _health_bonus);
-    ds_map_add(item, "perm_strength", _perm_str);
-    ds_map_add(item, "perm_intelligence", _perm_int);
-    ds_map_add(item, "perm_agility", _perm_agi);
-    
-    ds_map_add(global.ItemDB, _id, item);
+    var item = AddItemToDB(_id, _name, _type, _price, _desc, _str_bonus, _int_bonus, _def_bonus, _equip_slot, _rarity, _stackable, _maxStack, _gold_bonus, _agi_bonus, _health_bonus);
+
+    if (ds_exists(item, ds_type_map)) {
+        item[? "perm_strength"] = _perm_str;
+        item[? "perm_intelligence"] = _perm_int;
+        item[? "perm_agility"] = _perm_agi;
+    }
 }
 // scr_rarity_system.gml
 // Расширенная система редкости для поддержки новых уровней

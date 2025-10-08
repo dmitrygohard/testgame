@@ -28,6 +28,37 @@ function init_inventory_system() {
     global.selected_hero_index = 0;
 
     init_trophy_system();
+
+    ensure_equipment_set_structs();
+    update_equipment_set_bonuses();
+}
+
+function ensure_equipment_set_structs() {
+    ensure_equipment_bonus_defaults();
+
+    if (!variable_struct_exists(global.hero, "equipment_set_bonuses")) {
+        global.hero.equipment_set_bonuses = {
+            strength: 0,
+            agility: 0,
+            intelligence: 0,
+            defense: 0,
+            max_health: 0,
+            gold_bonus: 0,
+            health_bonus: 0
+        };
+    }
+
+    if (!variable_struct_exists(global.hero, "active_sets")) {
+        global.hero.active_sets = [];
+    }
+
+    if (!variable_global_exists("equipment_set_effects")) {
+        global.equipment_set_effects = {
+            reward_multiplier: 1.0,
+            speed_multiplier: 1.0,
+            success_bonus: 0
+        };
+    }
 }
 
 function ensure_equipment_bonus_defaults() {
@@ -330,7 +361,9 @@ function EquipItem(item_index, character_index, slot_type) {
     if (variable_global_exists("update_hero_max_health")) {
         update_hero_max_health();
     }
-    
+
+    update_equipment_set_bonuses();
+
     add_notification("Экипировано: " + db_data[? "name"]);
     return true;
 }
@@ -356,105 +389,6 @@ function UnequipItem(character_index, slot_type) {
     // Получаем ID предмета из слота
     var item_id = variable_struct_get(global.equipment_slots[character_index], slot_type);
     
-    // Проверяем, не пустой ли слот
-    if (item_id == -1) {
-        return false;
-    }
-    
-    // Получаем данные предмета из базы
-    var item_data = ds_map_find_value(global.ItemDB, item_id);
-    if (item_data == -1) {
-        show_debug_message("Ошибка: Предмет с ID " + string(item_id) + " не найден в базе данных!");
-        return false;
-    }
-    
-    // ИНИЦИАЛИЗИРУЕМ СВОЙСТВА БОНУСОВ ПЕРЕД ВЫЧИТАНИЕМ
-    if (!variable_struct_exists(global.hero, "equipment_bonuses")) {
-        global.hero.equipment_bonuses = {};
-    }
-    
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "strength")) global.hero.equipment_bonuses.strength = 0;
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "agility")) global.hero.equipment_bonuses.agility = 0;
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "intelligence")) global.hero.equipment_bonuses.intelligence = 0;
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "defense")) global.hero.equipment_bonuses.defense = 0;
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "max_health")) global.hero.equipment_bonuses.max_health = 0;
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "gold_bonus")) global.hero.equipment_bonuses.gold_bonus = 0;
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "health_bonus")) global.hero.equipment_bonuses.health_bonus = 0;
-    
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "perm_strength")) global.hero.equipment_bonuses.perm_strength = 0;
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "perm_intelligence")) global.hero.equipment_bonuses.perm_intelligence = 0;
-    if (!variable_struct_exists(global.hero.equipment_bonuses, "perm_agility")) global.hero.equipment_bonuses.perm_agility = 0;
-    
-    // БЕЗОПАСНО УБИРАЕМ БОНУСЫ ПРЕДМЕТА
-    var strength_bonus = item_data[? "strength_bonus"];
-    if (!is_undefined(strength_bonus)) global.hero.equipment_bonuses.strength -= strength_bonus;
-    //        return false;
-    }
-    
-    // Проверяем существование героя
-    if (!variable_global_exists("hero")) {
-        show_debug_message("Ошибка: Герой не инициализирован!");
-        return false;
-    }
-    
-    // Получаем ID предмета из слота
-    var item_id = variable_struct_get(global.equipment_slots[character_index], slot_type);
-    
-    // Проверяем, не пустой ли слот
-    if (item_id == -1) {
-        return false;
-    }
-    
-    // Получаем данные предмета из базы
-    var item_data = ds_map_find_value(global.ItemDB, item_id);
-    if (item_data == -1) {
-        show_debug_message("Ошибка: Предмет с ID " + string(item_id) + " не найден в базе данных!");
-        return false;
-    }
-    
-    // ИНИЦИАЛИЗИРУЕМ СВОЙСТВА БОНУСОВ ПЕРЕД ВЫЧИТАНИЕМ
-    ensure_equipment_bonus_defaults();
-    
-    // БЕЗОПАСНО УБИРАЕМ БОНУСЫ ПРЕДМЕТА
-    var strength_bonus = item_data[? "strength_bonus"];
-    if (!is_undefined(strength_bonus)) global.hero.equipment_bonuses.strength -= strength_bonus;
-    // Обновляем систему бафов от предметов
-    if (variable_global_exists("update_companion_buff_system")) {
-        update_companion_buff_system();
-    }
-    var agility_bonus = item_data[? "agility_bonus"];
-    if (!is_undefined(agility_bonus)) global.hero.equipment_bonuses.agility -= agility_bonus;
-    
-    var intelligence_bonus = item_data[? "intelligence_bonus"];
-    if (!is_undefined(intelligence_bonus)) global.hero.equipment_bonuses.intelligence -= intelligence_bonus;
-    
-    var defense_bonus = item_data[? "defense_bonus"];
-    if (!is_undefined(defense_bonus)) global.hero.equipment_bonuses.defense -= defense_bonus;
-    
-    var max_health_bonus = item_data[? "max_health_bonus"];
-    if (!is_undefined(max_health_bonus)) global.hero.equipment_bonuses.max_health -= max_health_bonus;
-    
-    var gold_bonus = item_data[? "gold_bonus"];
-    if (!is_undefined(gold_bonus)) global.hero.equipment_bonuses.gold_bonus -= gold_bonus;
-    
-    var health_bonus = item_data[? "health_bonus"];
-    if (!is_undefined(health_bonus)) global.hero.equipment_bonuses.health_bonus -= health_bonus;
-    
-    // УБИРАЕМ ПЕРМАНЕНТНЫЕ БОНУСЫ
-    var perm_strength = item_data[? "perm_strength"];
-    if (!is_undefined(perm_strength)) {
-        global.hero.equipment_bonuses.perm_strength -= perm_strength;
-        global.hero.strength -= perm_strength;
-    }
-    
-    var perm_intelligence = item_data[? "perm_intelligence"];
-    if (!is_undefined(perm_intelligence)) {
-        global.hero.equipment_bonuses.perm_intelligence -= perm_intelligence;
-        global.hero.intelligence -= perm_intelligence;
-    }
-    
-    var perm_agility = item_data[? "perm_agility"];
-    if (!is_undefined(perm_agility)) {
         global.hero.equipment_bonuses.perm_agility -= perm_agility;
         global.hero.agility -= perm_agility;
     }
@@ -480,11 +414,13 @@ function UnequipItem(character_index, slot_type) {
     
     // Очищаем слот экипировки
     variable_struct_set(global.equipment_slots[character_index], slot_type, -1);
-    
-    add_notification("Снято: " + item_data[? "name"]);
-    
-    return true;
 
+    update_equipment_set_bonuses();
+
+    add_notification("Снято: " + item_data[? "name"]);
+
+    return true;
+}
 
 function RemoveItemFromInventory(_itemId, _quantity) {
     // Проверяем, существует ли инвентарь игрока
@@ -784,11 +720,46 @@ function use_potion(p_item_id) {
     add_notification("Не удалось использовать: " + item_name);
     return false;
 }
+function init_item_sets() {
+    reset_item_set_map();
+
+    define_item_set("storm_legacy", "Наследие Бури", "Штормовое", "Арсенал, выкованный молниями и закаленный в циклонах.");
+    add_set_piece("storm_legacy", "stormcallers_edge");
+    add_set_piece("storm_legacy", "tempest_plate");
+    add_set_piece("storm_legacy", "cyclone_loop");
+    add_set_piece("storm_legacy", "eye_of_typhoon");
+    add_set_bonus("storm_legacy", 2, "Шторм ускоряет удары: +4 силы, +6 ловкости.", { strength: 4, agility: 6 });
+    add_set_bonus("storm_legacy", 3, "Электрический панцирь: +10 защиты и +40 здоровья.", { defense: 10, max_health: 40 });
+    add_set_bonus("storm_legacy", 4, "Буря несёт богатства: награды +35%, успех +5%.", { agility: 4 }, { reward_multiplier: 1.35, success_bonus: 5 });
+
+    define_item_set("arcane_paradox", "Арканический парадокс", "Хрономантия", "Инструменты, переплетающие время, знания и риск.");
+    add_set_piece("arcane_paradox", "paradox_staff");
+    add_set_piece("arcane_paradox", "chronoweave_robe");
+    add_set_piece("arcane_paradox", "loop_of_infinite_ink");
+    add_set_piece("arcane_paradox", "timebound_tome");
+    add_set_bonus("arcane_paradox", 2, "Сознание вне времени: +8 интеллекта, +2 защиты.", { intelligence: 8, defense: 2 });
+    add_set_bonus("arcane_paradox", 3, "Сферы замедляют угрозы: +5 ловкости, +60 здоровья.", { agility: 5, max_health: 60 });
+    add_set_bonus("arcane_paradox", 4, "Временные петли: экспедиции быстрее на 20%, успех +7%.", { intelligence: 5 }, { speed_multiplier: 0.8, success_bonus: 7 });
+
+    define_item_set("iron_frontier", "Ковенант железного фронтира", "Осада", "Неодолимый оплот, удерживающий самый тяжёлый натиск.");
+    add_set_piece("iron_frontier", "frontier_bastion");
+    add_set_piece("iron_frontier", "bulwark_carapace");
+    add_set_piece("iron_frontier", "sentinel_seal");
+    add_set_piece("iron_frontier", "heart_of_citadels");
+    add_set_bonus("iron_frontier", 2, "Живая крепость: +12 защиты и +30 здоровья.", { defense: 12, max_health: 30 });
+    add_set_bonus("iron_frontier", 3, "Контрудар гарнизона: +6 силы и +6 защиты.", { strength: 6, defense: 6 });
+    add_set_bonus("iron_frontier", 4, "Панцирь гарнизона: награды +20%, успех +10%.", { max_health: 50 }, { reward_multiplier: 1.2, success_bonus: 10 });
+}
+
 // scr_init_item_database.gml
 
 function scr_init_item_database() {
     show_debug_message("Инициализация расширенной базы данных предметов...");
-    
+
+    if (variable_global_exists("ItemDB") && ds_exists(global.ItemDB, ds_type_map)) {
+        ds_map_destroy(global.ItemDB);
+    }
+
     global.ItemDB = ds_map_create();
 
     // Типы предметов
@@ -811,155 +782,123 @@ function scr_init_item_database() {
         RELIC: 3
     };
 
-    // ==================== ПРЕДМЕТЫ ДЛЯ НАЧАЛА ИГРЫ (УРОВНИ 1-10) ====================
-    
-    // Простое оружие
-    AddItemToDB("wooden_sword", "Деревянный меч", global.ITEM_TYPE.WEAPON, 50, "Простое оружие для начинающих.", 2, 0, 0, global.EQUIP_SLOT.WEAPON, 0);
-    AddItemToDB("apprentice_staff", "Посох ученика", global.ITEM_TYPE.WEAPON, 60, "Базовый магический посох.", 0, 3, 0, global.EQUIP_SLOT.WEAPON, 0);
-    AddItemToDB("hunting_bow", "Охотничий лук", global.ITEM_TYPE.WEAPON, 55, "Простой лук для охоты.", 1, 0, 1, global.EQUIP_SLOT.WEAPON, 0);
-    
-    // Базовая броня
-    AddItemToDB("cloth_robe", "Тканевая роба", global.ITEM_TYPE.ARMOR, 40, "Простая роба новичка.", 0, 1, 2, global.EQUIP_SLOT.ARMOR, 0);
-    AddItemToDB("leather_helmet", "Кожаный шлем", global.ITEM_TYPE.ARMOR, 45, "Базовая защита головы.", 0, 0, 3, global.EQUIP_SLOT.ARMOR, 0);
-    AddItemToDB("traveler_boots", "Сапоги путешественника", global.ITEM_TYPE.ARMOR, 35, "Удобные для длинных походов.", 0, 0, 1, global.EQUIP_SLOT.ARMOR, 0);
-    
-    // Аксессуары для начинающих
-    AddItemToDB("novice_ring", "Кольцо новичка", global.ITEM_TYPE.ACCESSORY, 80, "Небольшой бонус ко всем атрибутам.", 1, 1, 1, global.EQUIP_SLOT.ACCESSORY, 0);
-    AddItemToDB("lucky_charm", "Талисман удачи", global.ITEM_TYPE.ACCESSORY, 70, "Немного увеличивает удачу.", 0, 0, 0, global.EQUIP_SLOT.ACCESSORY, 0);
-    AddItemToDB("health_amulet", "Амулет здоровья", global.ITEM_TYPE.ACCESSORY, 90, "Увеличивает максимальное здоровье.", 0, 0, 0, global.EQUIP_SLOT.ACCESSORY, 0);
+    init_item_sets();
 
-    // ==================== ПРЕДМЕТЫ СРЕДНЕЙ ИГРЫ (УРОВНИ 10-20) ====================
-    
-    // Улучшенное оружие
-    AddItemToDB("iron_sword", "Железный меч", global.ITEM_TYPE.WEAPON, 200, "Надежное железное оружие.", 5, 0, 0, global.EQUIP_SLOT.WEAPON, 1);
-    AddItemToDB("mage_wand", "Волшебная палочка", global.ITEM_TYPE.WEAPON, 220, "Усиливает магические способности.", 0, 6, 0, global.EQUIP_SLOT.WEAPON, 1);
-    AddItemToDB("composite_bow", "Композитный лук", global.ITEM_TYPE.WEAPON, 210, "Более точный и мощный лук.", 3, 0, 2, global.EQUIP_SLOT.WEAPON, 1);
-    
-    // Средняя броня
-    AddItemToDB("chain_armor", "Кольчужная броня", global.ITEM_TYPE.ARMOR, 180, "Хорошая защита от физических атак.", 0, 0, 8, global.EQUIP_SLOT.ARMOR, 1);
-    AddItemToDB("mage_robe", "Мантия мага", global.ITEM_TYPE.ARMOR, 190, "Увеличивает магическую силу.", 0, 4, 3, global.EQUIP_SLOT.ARMOR, 1);
-    AddItemToDB("ranger_cloak", "Плащ следопыта", global.ITEM_TYPE.ARMOR, 170, "Помогает оставаться незаметным.", 2, 2, 4, global.EQUIP_SLOT.ARMOR, 1);
-    
-    // Аксессуары среднего уровня
-    AddItemToDB("warrior_bracelet", "Браслет воина", global.ITEM_TYPE.ACCESSORY, 250, "Увеличивает физическую силу.", 4, 0, 0, global.EQUIP_SLOT.ACCESSORY, 1);
-    AddItemToDB("sage_earring", "Серьга мудреца", global.ITEM_TYPE.ACCESSORY, 260, "Усиливает интеллект.", 0, 5, 0, global.EQUIP_SLOT.ACCESSORY, 1);
-    AddItemToDB("guardian_pendant", "Кулон защитника", global.ITEM_TYPE.ACCESSORY, 240, "Повышает защиту.", 0, 0, 6, global.EQUIP_SLOT.ACCESSORY, 1);
+    var equipment_definitions = [
+        { id: "wanderer_blade", name: "Клинок странника", type: global.ITEM_TYPE.WEAPON, price: 80, desc: "Бывший меч новобранца, привыкший к дальним дорогам.", strength: 3, agility: 1, slot: global.EQUIP_SLOT.WEAPON, rarity: 0 },
+        { id: "sapling_wand", name: "Посох ростка", type: global.ITEM_TYPE.WEAPON, price: 85, desc: "Живая древесина усиливает природную магию.", intelligence: 4, slot: global.EQUIP_SLOT.WEAPON, rarity: 0 },
+        { id: "scout_sling", name: "Праща разведчика", type: global.ITEM_TYPE.WEAPON, price: 75, desc: "Метает камни с точностью опытного скаута.", strength: 1, agility: 2, slot: global.EQUIP_SLOT.WEAPON, rarity: 0 },
+        { id: "linen_coat", name: "Льняной колет", type: global.ITEM_TYPE.ARMOR, price: 60, desc: "Лёгкая защита, впитавшая запахи первой экспедиции.", defense: 3, intelligence: 1, slot: global.EQUIP_SLOT.ARMOR, rarity: 0 },
+        { id: "stone_guard", name: "Каменный нагрудник", type: global.ITEM_TYPE.ARMOR, price: 95, desc: "Пластина из полированного гранита.", defense: 5, max_health: 20, slot: global.EQUIP_SLOT.ARMOR, rarity: 0 },
+        { id: "windrunner_boots", name: "Ботинки вихря", type: global.ITEM_TYPE.ARMOR, price: 110, desc: "Подошвы нашиты перьями, ускоряющими шаг.", agility: 3, defense: 1, slot: global.EQUIP_SLOT.ARMOR, rarity: 1 },
+        { id: "ember_ring", name: "Углистый перстень", type: global.ITEM_TYPE.ACCESSORY, price: 140, desc: "Удерживает тёплый жар костра.", strength: 2, gold: 4, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 1 },
+        { id: "mindfocus_charm", name: "Амулет сосредоточения", type: global.ITEM_TYPE.ACCESSORY, price: 155, desc: "Тонкий рисунок уравновешивает мысли.", intelligence: 3, defense: 1, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 1 },
+        { id: "ironbark_brooch", name: "Брошь железокора", type: global.ITEM_TYPE.ACCESSORY, price: 150, desc: "Кора, напитанная минералами, усиливает стойкость.", defense: 2, max_health: 25, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 1 },
+        { id: "resonant_totem", name: "Резонансный тотем", type: global.ITEM_TYPE.RELIC, price: 220, desc: "Впитывает отголоски побед и переводит их в силу.", strength: 2, intelligence: 2, slot: global.EQUIP_SLOT.RELIC, rarity: 1 },
+        { id: "aurora_tablet", name: "Пластина авроры", type: global.ITEM_TYPE.RELIC, price: 260, desc: "Хранит северное сияние, укрепляя тело.", defense: 3, max_health: 30, slot: global.EQUIP_SLOT.RELIC, rarity: 1 },
+        { id: "sunsteel_sabre", name: "Сабля солнечной стали", type: global.ITEM_TYPE.WEAPON, price: 620, desc: "Рубит так же быстро, как рассвет рассеивает тьму.", strength: 6, agility: 2, slot: global.EQUIP_SLOT.WEAPON, rarity: 2 },
+        { id: "starseer_staff", name: "Посох звёздочёта", type: global.ITEM_TYPE.WEAPON, price: 640, desc: "Хранит фрагменты ночного неба.", intelligence: 7, defense: 1, slot: global.EQUIP_SLOT.WEAPON, rarity: 2 },
+        { id: "stormstriker_bow", name: "Лук грозового удара", type: global.ITEM_TYPE.WEAPON, price: 660, desc: "Тетива впитывает статический заряд.", strength: 3, agility: 5, slot: global.EQUIP_SLOT.WEAPON, rarity: 2 },
+        { id: "duskcarapace", name: "Сумеречный панцирь", type: global.ITEM_TYPE.ARMOR, price: 720, desc: "Заглушает звуки шагов и гасит удары.", defense: 9, agility: 2, slot: global.EQUIP_SLOT.ARMOR, rarity: 2 },
+        { id: "astral_mantle", name: "Астральная мантия", type: global.ITEM_TYPE.ARMOR, price: 780, desc: "Глифы усиливают поток маны.", intelligence: 6, defense: 4, slot: global.EQUIP_SLOT.ARMOR, rarity: 2 },
+        { id: "shadowmantle", name: "Плащ теней", type: global.ITEM_TYPE.ARMOR, price: 740, desc: "Скрывает силуэт и помогает уклоняться.", agility: 6, defense: 3, slot: global.EQUIP_SLOT.ARMOR, rarity: 2 },
+        { id: "rallying_girdle", name: "Пояс воодушевления", type: global.ITEM_TYPE.ACCESSORY, price: 520, desc: "Собирает силу отряда в одно целое.", strength: 4, defense: 2, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 2 },
+        { id: "stargazer_band", name: "Кольцо звёздочёта", type: global.ITEM_TYPE.ACCESSORY, price: 540, desc: "Излучает мягкий свет, очищающий разум.", intelligence: 5, agility: 1, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 2 },
+        { id: "whisper_cloak", name: "Покров шёпота", type: global.ITEM_TYPE.ACCESSORY, price: 510, desc: "Волокна шёлка гасят любое движение.", agility: 4, max_health: 20, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 2 },
+        { id: "aurora_relic", name: "Реликвия рассвета", type: global.ITEM_TYPE.RELIC, price: 920, desc: "Сияние усиливает магические навыки.", intelligence: 4, defense: 2, slot: global.EQUIP_SLOT.RELIC, rarity: 2 },
+        { id: "stoneward_idol", name: "Идол каменного стража", type: global.ITEM_TYPE.RELIC, price: 960, desc: "Призывает терпение древних големов.", defense: 5, max_health: 40, slot: global.EQUIP_SLOT.RELIC, rarity: 2 },
+        { id: "echoing_compass", name: "Отголосочный компас", type: global.ITEM_TYPE.RELIC, price: 980, desc: "Ведёт к скрытым артефактам.", gold: 10, defense: 2, slot: global.EQUIP_SLOT.RELIC, rarity: 2 },
+        { id: "hepo_ancient_tome", name: "Древний фолиант Хэпо", type: global.ITEM_TYPE.ACCESSORY, price: 1500, desc: "Хэпо изучает забытые тактики, усиливая отряд.", intelligence: 8, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 3 },
+        { id: "fatty_energy_crystal", name: "Энергетический кристалл Фэтти", type: global.ITEM_TYPE.ACCESSORY, price: 1600, desc: "Хранит сладкую энергию для длинных походов.", defense: 3, max_health: 60, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 3 },
+        { id: "discipline_golden_scale", name: "Золотые весы Дисциплины", type: global.ITEM_TYPE.ACCESSORY, price: 1550, desc: "Отмеряет выгоду каждой экспедиции.", intelligence: 4, gold: 12, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 3 },
+        { id: "trinity_medallion", name: "Медальон троицы", type: global.ITEM_TYPE.ACCESSORY, price: 5200, desc: "Синхронизирует такт всех помощниц.", strength: 5, intelligence: 5, defense: 5, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4 },
+        { id: "expedition_compass", name: "Компас экспедиций", type: global.ITEM_TYPE.ACCESSORY, price: 4800, desc: "Показывает кратчайший путь через хаос.", agility: 2, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4 },
+        { id: "lucky_dice", name: "Игральные кости удачи", type: global.ITEM_TYPE.ACCESSORY, price: 4900, desc: "Каждый бросок в пользу отряда.", gold: 18, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4 },
+        { id: "stormcallers_edge", name: "Клинок штормов", type: global.ITEM_TYPE.WEAPON, price: 18500, desc: "Вызывает грозу с каждым взмахом.", strength: 9, agility: 6, slot: global.EQUIP_SLOT.WEAPON, rarity: 4, set_id: "storm_legacy", set_piece_name: "Клинок" },
+        { id: "tempest_plate", name: "Панцирь бури", type: global.ITEM_TYPE.ARMOR, price: 17800, desc: "Проводит молнии вдоль контуров брони.", agility: 4, defense: 12, slot: global.EQUIP_SLOT.ARMOR, rarity: 4, set_id: "storm_legacy", set_piece_name: "Панцирь" },
+        { id: "cyclone_loop", name: "Кольцо циклона", type: global.ITEM_TYPE.ACCESSORY, price: 16200, desc: "Невидимые вихри защищают владельца.", agility: 5, gold: 8, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4, set_id: "storm_legacy", set_piece_name: "Кольцо" },
+        { id: "eye_of_typhoon", name: "Око тайфуна", type: global.ITEM_TYPE.RELIC, price: 17500, desc: "Хранит тишину внутри шторма.", intelligence: 4, agility: 4, defense: 4, slot: global.EQUIP_SLOT.RELIC, rarity: 4, set_id: "storm_legacy", set_piece_name: "Реликвия" },
+        { id: "paradox_staff", name: "Посох парадокса", type: global.ITEM_TYPE.WEAPON, price: 19000, desc: "Преломляет время, позволяя видеть будущее удара.", intelligence: 10, defense: 2, slot: global.EQUIP_SLOT.WEAPON, rarity: 4, set_id: "arcane_paradox", set_piece_name: "Посох" },
+        { id: "chronoweave_robe", name: "Хронопокров", type: global.ITEM_TYPE.ARMOR, price: 18600, desc: "Каждая нить сплетена с прошедшим и будущим моментом.", intelligence: 8, max_health: 60, slot: global.EQUIP_SLOT.ARMOR, rarity: 4, set_id: "arcane_paradox", set_piece_name: "Одеяние" },
+        { id: "loop_of_infinite_ink", name: "Петля бесконечных чернил", type: global.ITEM_TYPE.ACCESSORY, price: 17300, desc: "Записывает все возможные исходы сражения.", intelligence: 6, gold: 6, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4, set_id: "arcane_paradox", set_piece_name: "Аксессуар" },
+        { id: "timebound_tome", name: "Том за пределами времени", type: global.ITEM_TYPE.RELIC, price: 18800, desc: "Перелистывает страницы быстрее течения часов.", intelligence: 7, defense: 3, slot: global.EQUIP_SLOT.RELIC, rarity: 4, set_id: "arcane_paradox", set_piece_name: "Реликвия" },
+        { id: "frontier_bastion", name: "Цитадель фронтира", type: global.ITEM_TYPE.WEAPON, price: 20000, desc: "Массивное копьё, служащее подвижной стеной.", strength: 9, defense: 6, slot: global.EQUIP_SLOT.WEAPON, rarity: 4, set_id: "iron_frontier", set_piece_name: "Оружие" },
+        { id: "bulwark_carapace", name: "Панцирь бастиона", type: global.ITEM_TYPE.ARMOR, price: 19800, desc: "Стягивает металлические пластины в непробиваемую оболочку.", defense: 14, max_health: 40, slot: global.EQUIP_SLOT.ARMOR, rarity: 4, set_id: "iron_frontier", set_piece_name: "Броня" },
+        { id: "sentinel_seal", name: "Печать стража", type: global.ITEM_TYPE.ACCESSORY, price: 17600, desc: "Закрепляет присягу стоять до конца.", defense: 5, max_health: 40, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4, set_id: "iron_frontier", set_piece_name: "Печать" },
+        { id: "heart_of_citadels", name: "Сердце цитаделей", type: global.ITEM_TYPE.RELIC, price: 20500, desc: "Пульс крепостей звучит внутри артефакта.", defense: 6, max_health: 80, slot: global.EQUIP_SLOT.RELIC, rarity: 4, set_id: "iron_frontier", set_piece_name: "Ядро" }
+    ];
 
-    // ==================== РЕДКИЕ ПРЕДМЕТЫ С УНИКАЛЬНЫМИ БАФАМИ ====================
-    
-    // Редкие предметы, которые дают новые бафы помощницам
-    AddItemToDB("hepo_ancient_tome", "Древний фолиант Хэпо", global.ITEM_TYPE.ACCESSORY, 1500, "Хэпо изучает древние тактики. БАФ: +20% к шансу успеха", 0, 8, 0, global.EQUIP_SLOT.ACCESSORY, 2);
-    AddItemToDB("fatty_energy_crystal", "Энергетический кристалл Фэтти", global.ITEM_TYPE.ACCESSORY, 1600, "Фэтти черпает силы из кристалла. БАФ: +30% к здоровью отряда", 0, 0, 10, global.EQUIP_SLOT.ACCESSORY, 2);
-    AddItemToDB("discipline_golden_scale", "Золотые весы Дисциплины", global.ITEM_TYPE.ACCESSORY, 1550, "Дисциплина находит лучшие сделки. БАФ: +25% к получаемому золоту", 0, 6, 0, global.EQUIP_SLOT.ACCESSORY, 2);
-    
-    // Легендарные предметы с мощными бафами
-    AddItemToDB("trinity_medallion", "Медальон Троицы", global.ITEM_TYPE.ACCESSORY, 5000, "Объединяет силы всех помощниц. БАФ: Все бафы усиливаются на 50%", 5, 5, 5, global.EQUIP_SLOT.ACCESSORY, 3);
-    AddItemToDB("expedition_compass", "Компас экспедиций", global.ITEM_TYPE.ACCESSORY, 4500, "Показывает кратчайший путь. БАФ: -40% времени экспедиции", 0, 0, 0, global.EQUIP_SLOT.ACCESSORY, 3);
-    AddItemToDB("lucky_dice", "Кости удачи", global.ITEM_TYPE.ACCESSORY, 4800, "Приносят невероятную удачу. БАФ: Шанс удвоить всю награду", 0, 0, 0, global.EQUIP_SLOT.ACCESSORY, 3);
+    for (var i = 0; i < array_length(equipment_definitions); i++) {
+        var def = equipment_definitions[i];
+        var strength = is_undefined(def.strength) ? 0 : def.strength;
+        var intelligence = is_undefined(def.intelligence) ? 0 : def.intelligence;
+        var defense = is_undefined(def.defense) ? 0 : def.defense;
+        var agility = is_undefined(def.agility) ? 0 : def.agility;
+        var max_health = is_undefined(def.max_health) ? 0 : def.max_health;
+        var health = is_undefined(def.health) ? 0 : def.health;
+        var gold = is_undefined(def.gold) ? 0 : def.gold;
+        var slot = is_undefined(def.slot) ? -1 : def.slot;
+        var rarity = is_undefined(def.rarity) ? 0 : def.rarity;
+        var stackable = is_undefined(def.stackable) ? false : def.stackable;
+        var maxStack = is_undefined(def.maxStack) ? 1 : def.maxStack;
+        var item_class = is_undefined(def.item_class) ? "standard" : def.item_class;
+        var set_id = is_undefined(def.set_id) ? "" : def.set_id;
+        var set_piece_name = is_undefined(def.set_piece_name) ? "" : def.set_piece_name;
 
-    // ==================== МОЩНЫЕ ПРЕДМЕТЫ ДЛЯ ПОЗДНЕЙ ИГРЫ ====================
-    
-    // Эпическое оружие
-    AddItemToDB("dragon_slayer", "Убийца драконов", global.ITEM_TYPE.WEAPON, 5000, "Меч, пропитанный кровью драконов.", 25, 0, 0, global.EQUIP_SLOT.WEAPON, 3);
-    AddItemToDB("staff_of_wisdom", "Посох мудрости", global.ITEM_TYPE.WEAPON, 7500, "Усиливает магические способности.", 5, 25, 5, global.EQUIP_SLOT.WEAPON, 3);
-    AddItemToDB("bow_of_accuracy", "Лук точности", global.ITEM_TYPE.WEAPON, 6000, "Никогда не промахивается.", 15, 0, 0, global.EQUIP_SLOT.WEAPON, 3);
+        AddItemToDB(def.id, def.name, def.type, def.price, def.desc, strength, intelligence, defense, slot, rarity, stackable, maxStack, item_class, agility, max_health, health, gold, set_id, set_piece_name);
+    }
 
-    // Эпическая броня
-    AddItemToDB("phantom_cloak", "Призрачный плащ", global.ITEM_TYPE.ARMOR, 8000, "Делает владельца невидимым.", 0, 15, 20, global.EQUIP_SLOT.ARMOR, 3);
-    AddItemToDB("titan_armor", "Доспех титана", global.ITEM_TYPE.ARMOR, 12000, "Невероятно прочная броня.", 10, 0, 40, global.EQUIP_SLOT.ARMOR, 3);
-    AddItemToDB("auric_plate", "Золотой панцирь", global.ITEM_TYPE.ARMOR, 13500, "Зеркальные пластины отражают магию.", 6, 4, 45, global.EQUIP_SLOT.ARMOR, 4);
-    AddItemToDB("mirage_mantle", "Плащ миражей", global.ITEM_TYPE.ARMOR, 9800, "Расщепляет свет и запутывает врагов.", 0, 18, 22, global.EQUIP_SLOT.ARMOR, 3);
+    var potion_definitions = [
+        { id: "health_potion", name: "Зелье здоровья", price: 50, desc: "Восстанавливает здоровье после стычки.", rarity: 0, maxStack: 10 },
+        { id: "greater_healing", name: "Сильное зелье здоровья", price: 120, desc: "Быстро залечивает глубокие раны.", rarity: 1, maxStack: 5 },
+        { id: "elixir_of_life", name: "Эликсир жизни", price: 320, desc: "Редкий настой, возвращающий силу.", rarity: 2, maxStack: 3 },
+        { id: "potion_of_strength", name: "Зелье силы", price: 220, desc: "+5 к силе на следующую экспедицию.", rarity: 1, maxStack: 5 },
+        { id: "potion_of_intellect", name: "Зелье интеллекта", price: 220, desc: "+5 к интеллекту на следующую экспедицию.", rarity: 1, maxStack: 5 },
+        { id: "potion_of_protection", name: "Зелье защиты", price: 220, desc: "+5 к защите на следующую экспедицию.", rarity: 1, maxStack: 5 },
+        { id: "potion_of_success", name: "Зелье успеха", price: 310, desc: "Повышает шансы на удачу в экспедиции.", rarity: 2, maxStack: 3 },
+        { id: "potion_of_gold", name: "Золотое зелье", price: 340, desc: "Увеличивает трофеи со следующей вылазки.", rarity: 2, maxStack: 3 }
+    ];
 
-    // Эпические аксессуары
-    AddItemToDB("ring_of_power", "Кольцо силы", global.ITEM_TYPE.ACCESSORY, 10000, "Увеличивает все характеристики.", 10, 10, 10, global.EQUIP_SLOT.ACCESSORY, 3);
-    AddItemToDB("amulet_of_immortality", "Амулет бессмертия", global.ITEM_TYPE.ACCESSORY, 25000, "Дарует сопротивление смерти.", 0, 20, 15, global.EQUIP_SLOT.ACCESSORY, 3);
-    AddItemToDB("astral_compass", "Астральный компас", global.ITEM_TYPE.ACCESSORY, 14000, "Ищет кратчайший путь к артефактам.", 3, 6, 3, global.EQUIP_SLOT.ACCESSORY, 4);
+    for (var p = 0; p < array_length(potion_definitions); p++) {
+        var pd = potion_definitions[p];
+        AddItemToDB(pd.id, pd.name, global.ITEM_TYPE.POTION, pd.price, pd.desc, 0, 0, 0, -1, pd.rarity, true, pd.maxStack);
 
-    // Поздняя игра — редкие клинки
-    AddItemToDB("stellar_blade", "Звёздный клинок", global.ITEM_TYPE.WEAPON, 15500, "Каждый удар оставляет сияющий след.", 32, 6, 0, global.EQUIP_SLOT.WEAPON, 4);
-    AddItemToDB("umbra_lash", "Плеть сумерек", global.ITEM_TYPE.WEAPON, 14800, "Поглощает силу врагов.", 18, 12, 5, global.EQUIP_SLOT.WEAPON, 4);
+    }
 
-    // ==================== ЗЕЛЬЯ И СВИТКИ ====================
-    
-    // Базовые зелья
-    AddItemToDB("health_potion", "Зелье здоровья", global.ITEM_TYPE.POTION, 50, "Восстанавливает 50 HP.", 0, 0, 0, -1, 0, true, 10);
-    AddItemToDB("greater_healing", "Сильное зелье здоровья", global.ITEM_TYPE.POTION, 120, "Восстанавливает 120 HP.", 0, 0, 0, -1, 1, true, 5);
-    AddItemToDB("elixir_of_life", "Эликсир жизни", global.ITEM_TYPE.POTION, 300, "Восстанавливает 300 HP.", 0, 0, 0, -1, 2, true, 3);
-    
-    // Зелья бафов
-    AddItemToDB("potion_of_strength", "Зелье силы", global.ITEM_TYPE.POTION, 200, "+5 к силе на 1 экспедицию.", 0, 0, 0, -1, 1, true, 5);
-    AddItemToDB("potion_of_intellect", "Зелье интеллекта", global.ITEM_TYPE.POTION, 200, "+5 к интеллекту на 1 экспедицию.", 0, 0, 0, -1, 1, true, 5);
-    AddItemToDB("potion_of_protection", "Зелье защиты", global.ITEM_TYPE.POTION, 200, "+5 к защите на 1 экспедицию.", 0, 0, 0, -1, 1, true, 5);
+    var scroll_definitions = [
+        { id: "scroll_teleport", name: "Свиток телепортации", price: 420, desc: "Мгновенно завершает экспедицию.", rarity: 2 },
+        { id: "scroll_protection", name: "Свиток защиты", price: 360, desc: "+50% защиты на следующую экспедицию.", rarity: 1 },
+        { id: "scroll_fortune", name: "Свиток удачи", price: 520, desc: "Удваивает награды следующей вылазки.", rarity: 2 },
+        { id: "scroll_haste", name: "Свиток скорости", price: 610, desc: "Ускоряет завершение экспедиции.", rarity: 2 }
+    ];
 
-    // Свитки
-    AddItemToDB("scroll_teleport", "Свиток телепортации", global.ITEM_TYPE.SCROLL, 400, "Мгновенно завершает экспедицию.", 0, 0, 0, -1, 2, true, 3);
-    AddItemToDB("scroll_protection", "Свиток защиты", global.ITEM_TYPE.SCROLL, 350, "+50% защиты на следующую экспедицию.", 0, 0, 0, -1, 1, true, 5);
-    AddItemToDB("scroll_fortune", "Свиток удачи", global.ITEM_TYPE.SCROLL, 500, "Удваивает награду за следующую экспедицию.", 0, 0, 0, -1, 2, true, 2);
-// Зелья для экспедиций
-AddItemToDB("potion_of_success", "Зелье успеха", global.ITEM_TYPE.POTION, 300, "Увеличивает шанс успеха следующей экспедиции.", 0, 0, 0, -1, 1, true, 3);
-AddItemToDB("potion_of_gold", "Золотое зелье", global.ITEM_TYPE.POTION, 350, "Увеличивает золото с следующей экспедиции.", 0, 0, 0, -1, 1, true, 3);
+    for (var s = 0; s < array_length(scroll_definitions); s++) {
+        var sd = scroll_definitions[s];
+        AddItemToDB(sd.id, sd.name, global.ITEM_TYPE.SCROLL, sd.price, sd.desc, 0, 0, 0, -1, sd.rarity, true, 3);
+    }
 
-// Свиток скорости
-AddItemToDB("scroll_haste", "Свиток скорости", global.ITEM_TYPE.SCROLL, 600, "Ускоряет завершение экспедиции.", 0, 0, 0, -1, 2, true, 2);
+    var trophy_definitions = [
+        { id: "trophy_first_victory", name: "Знамя первопроходца", desc: "Символ первой победы в экспедиции." },
+        { id: "trophy_perfect_run", name: "Безупречный шлем", desc: "Даруется за поход без единой царапины." },
+        { id: "trophy_gilded_ledger", name: "Позолоченный реестр", desc: "Подтверждает внушительные накопления." },
+        { id: "trophy_training_mosaic", name: "Мозаика наставника", desc: "Собрана из осколков долгих тренировок." }
+    ];
 
-// Уникальные трофеи
-AddItemToDB("trophy_first_victory", "Знамя первопроходца", global.ITEM_TYPE.TROPHY, 0, "Память о первой победе в экспедиции.", 0, 0, 0, -1, 5, false, 1, "trophy");
-AddItemToDB("trophy_perfect_run", "Безупречный шлем", global.ITEM_TYPE.TROPHY, 0, "Награда за экспедицию без ранений героя.", 0, 0, 0, -1, 5, false, 1, "trophy");
-AddItemToDB("trophy_gilded_ledger", "Позолоченный реестр", global.ITEM_TYPE.TROPHY, 0, "Подтверждает внушительный запас золота.", 0, 0, 0, -1, 5, false, 1, "trophy");
-AddItemToDB("trophy_training_mosaic", "Мозаика наставника", global.ITEM_TYPE.TROPHY, 0, "Собрана из фрагментов длительной тренировки.", 0, 0, 0, -1, 5, false, 1, "trophy");
+    for (var t = 0; t < array_length(trophy_definitions); t++) {
+        var td = trophy_definitions[t];
+        AddItemToDB(td.id, td.name, global.ITEM_TYPE.TROPHY, 0, td.desc, 0, 0, 0, -1, 5, false, 1, "trophy");
+
+    }
+
     // Добавляем свойства для зелий и свитков
+
     AddItemProperties();
-    
+
     // Добавляем свойства для редких предметов с бафами
+
     AddCompanionBuffProperties();
-    
+
     show_debug_message("Расширенная база данных предметов успешно инициализирована: " + string(ds_map_size(global.ItemDB)) + " предметов");
-}
-
-function AddCompanionBuffProperties() {
-    // Свойства для редких предметов, которые дают бафы помощницам
-    
-    // Предметы Хэпо
-    SetItemProperty("hepo_ancient_tome", "companion_buff", "hepo_success");
-    SetItemProperty("hepo_ancient_tome", "buff_power", 20);
-    
-    // Предметы Фэтти
-    SetItemProperty("fatty_energy_crystal", "companion_buff", "fatty_health");
-    SetItemProperty("fatty_energy_crystal", "buff_power", 30);
-    
-    // Предметы Дисциплины
-    SetItemProperty("discipline_golden_scale", "companion_buff", "discipline_gold");
-    SetItemProperty("discipline_golden_scale", "buff_power", 25);
-    
-    // Легендарные предметы
-    SetItemProperty("trinity_medallion", "companion_buff", "all_buffs_boost");
-    SetItemProperty("trinity_medallion", "buff_power", 50);
-    
-    SetItemProperty("expedition_compass", "companion_buff", "expedition_speed");
-    SetItemProperty("expedition_compass", "buff_power", 40);
-    
-    SetItemProperty("lucky_dice", "companion_buff", "double_rewards");
-    SetItemProperty("lucky_dice", "buff_power", 15); // 15% шанс
-}
-
-function AddItemToDB(_id, _name, _type, _price, _desc, _str_bonus, _int_bonus, _def_bonus, _equip_slot, _rarity, _stackable = false, _maxStack = 1, _item_class = "standard") {
-    var item = ds_map_create();
-
-    ds_map_add(item, "id", _id);
-    ds_map_add(item, "name", _name);
-    ds_map_add(item, "type", _type);
-    ds_map_add(item, "price", _price);
-    ds_map_add(item, "description", _desc);
-    ds_map_add(item, "strength_bonus", _str_bonus);
-    ds_map_add(item, "intelligence_bonus", _int_bonus);
-    ds_map_add(item, "defense_bonus", _def_bonus);
-    ds_map_add(item, "equip_slot", _equip_slot);
-    ds_map_add(item, "rarity", _rarity);
-    ds_map_add(item, "stackable", _stackable);
-    ds_map_add(item, "maxStack", _maxStack);
-    ds_map_add(item, "item_class", _item_class);
-
-    ds_map_add(global.ItemDB, _id, item);
 }
 
 // scr_init_item_database.gml - обновляем функцию AddItemProperties
@@ -1003,6 +942,417 @@ function SetItemProperty(item_id, property, value) {
     var item_data = ds_map_find_value(global.ItemDB, item_id);
     if (item_data != undefined) {
         ds_map_add(item_data, property, value);
+    }
+}
+
+function AddItemToDB(_id, _name, _type, _price, _desc, _str_bonus = 0, _int_bonus = 0, _def_bonus = 0, _equip_slot = -1, _rarity = 0, _stackable = false, _maxStack = 1, _item_class = "standard", _agility_bonus = 0, _max_health_bonus = 0, _health_bonus = 0, _gold_bonus = 0, _set_id = "", _set_piece_name = "") {
+    if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) {
+        global.ItemDB = ds_map_create();
+    }
+
+    if (!is_string(_item_class)) {
+        _gold_bonus = _item_class;
+        _item_class = "standard";
+    }
+
+    if (ds_map_exists(global.ItemDB, _id)) {
+        var existing = ds_map_find_value(global.ItemDB, _id);
+        if (ds_exists(existing, ds_type_map)) {
+            ds_map_destroy(existing);
+        }
+        ds_map_delete(global.ItemDB, _id);
+    }
+
+    var item = ds_map_create();
+    ds_map_add(item, "id", _id);
+    ds_map_add(item, "name", _name);
+    ds_map_add(item, "type", _type);
+    ds_map_add(item, "price", _price);
+    ds_map_add(item, "description", _desc);
+    ds_map_add(item, "rarity", _rarity);
+    ds_map_add(item, "equip_slot", _equip_slot);
+    ds_map_add(item, "stackable", _stackable);
+    ds_map_add(item, "maxStack", max(1, _maxStack));
+    ds_map_add(item, "item_class", _item_class);
+    ds_map_add(item, "set_id", _set_id);
+    ds_map_add(item, "set_piece_name", _set_piece_name);
+
+    ds_map_add(item, "strength_bonus", _str_bonus);
+    ds_map_add(item, "agility_bonus", _agility_bonus);
+    ds_map_add(item, "intelligence_bonus", _int_bonus);
+    ds_map_add(item, "defense_bonus", _def_bonus);
+    ds_map_add(item, "max_health_bonus", _max_health_bonus);
+    ds_map_add(item, "health_bonus", _health_bonus);
+    ds_map_add(item, "gold_bonus", _gold_bonus);
+
+    // Заглушки для временных эффектов и специальных свойств
+    ds_map_add(item, "temp_strength", 0);
+    ds_map_add(item, "temp_agility", 0);
+    ds_map_add(item, "temp_intelligence", 0);
+    ds_map_add(item, "temp_defense", 0);
+    ds_map_add(item, "expedition_success_bonus", 0);
+    ds_map_add(item, "expedition_gold_bonus", 0);
+    ds_map_add(item, "instant_complete", false);
+    ds_map_add(item, "defense_multiplier", 0);
+    ds_map_add(item, "reward_multiplier", 0);
+    ds_map_add(item, "expedition_speed", 0);
+
+    // Трофейные поля по умолчанию
+    ds_map_add(item, "icon", "");
+    ds_map_add(item, "trophy_condition", "");
+
+    if (_item_class == "trophy") {
+        item[? "stackable"] = false;
+        item[? "maxStack"] = 1;
+    }
+
+    ds_map_add(global.ItemDB, _id, item);
+    return item;
+}
+
+function ensure_item_set_map() {
+    if (!variable_global_exists("ItemSets") || !ds_exists(global.ItemSets, ds_type_map)) {
+        global.ItemSets = ds_map_create();
+    }
+}
+
+function reset_item_set_map() {
+    ensure_item_set_map();
+
+    var keys = ds_map_keys_to_array(global.ItemSets);
+    for (var i = 0; i < array_length(keys); i++) {
+        var key = keys[i];
+        var set_map = ds_map_find_value(global.ItemSets, key);
+        if (set_map != -1) {
+            ds_map_destroy(set_map);
+        }
+    }
+
+    ds_map_clear(global.ItemSets);
+}
+
+function define_item_set(_id, _name, _theme, _description) {
+    ensure_item_set_map();
+
+    if (ds_map_exists(global.ItemSets, _id)) {
+        var old_set = ds_map_find_value(global.ItemSets, _id);
+        if (old_set != -1) {
+            ds_map_destroy(old_set);
+        }
+        ds_map_delete(global.ItemSets, _id);
+    }
+
+    var set = ds_map_create();
+    ds_map_add(set, "id", _id);
+    ds_map_add(set, "name", _name);
+    ds_map_add(set, "theme", _theme);
+    ds_map_add(set, "description", _description);
+    ds_map_add(set, "pieces", []);
+    ds_map_add(set, "bonuses", []);
+
+    ds_map_add(global.ItemSets, _id, set);
+
+    return set;
+}
+
+function array_index_of(arr, value) {
+    for (var i = 0; i < array_length(arr); i++) {
+        if (arr[i] == value) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+function add_set_piece(_set_id, _item_id) {
+    if (!variable_global_exists("ItemSets") || !ds_exists(global.ItemSets, ds_type_map)) {
+        return;
+    }
+
+    if (!ds_map_exists(global.ItemSets, _set_id)) {
+        return;
+    }
+
+    var set = ds_map_find_value(global.ItemSets, _set_id);
+    if (set == -1) {
+        return;
+    }
+
+    var pieces = set[? "pieces"];
+    if (array_index_of(pieces, _item_id) == -1) {
+        array_push(pieces, _item_id);
+        set[? "pieces"] = pieces;
+    }
+}
+
+function sort_set_bonus_array(bonuses) {
+    for (var i = 0; i < array_length(bonuses); i++) {
+        for (var j = i + 1; j < array_length(bonuses); j++) {
+            if (bonuses[j].count < bonuses[i].count) {
+                var temp = bonuses[i];
+                bonuses[i] = bonuses[j];
+                bonuses[j] = temp;
+            }
+        }
+    }
+
+    return bonuses;
+}
+
+function add_set_bonus(_set_id, _count, _description, _stats = undefined, _effects = undefined) {
+    if (!variable_global_exists("ItemSets") || !ds_exists(global.ItemSets, ds_type_map)) {
+        return;
+    }
+
+    if (!ds_map_exists(global.ItemSets, _set_id)) {
+        return;
+    }
+
+    var set = ds_map_find_value(global.ItemSets, _set_id);
+    if (set == -1) {
+        return;
+    }
+
+    var entry = {
+        count: _count,
+        description: _description,
+        stats: is_undefined(_stats) ? {} : _stats,
+        effects: is_undefined(_effects) ? {} : _effects
+    };
+
+    var bonuses = set[? "bonuses"];
+    array_push(bonuses, entry);
+    bonuses = sort_set_bonus_array(bonuses);
+    set[? "bonuses"] = bonuses;
+}
+
+function get_set_definition(set_id) {
+    if (!variable_global_exists("ItemSets") || !ds_exists(global.ItemSets, ds_type_map)) {
+        return -1;
+    }
+    if (!ds_map_exists(global.ItemSets, set_id)) {
+        return -1;
+    }
+    return ds_map_find_value(global.ItemSets, set_id);
+}
+
+function get_equipped_set_piece_count(set_id) {
+    if (!variable_global_exists("equipment_slots")) {
+        return 0;
+    }
+
+    if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) {
+        return 0;
+    }
+
+    var hero_equipment = global.equipment_slots[0];
+    var slot_names = ["weapon", "armor", "accessory", "relic"];
+    var count = 0;
+
+    for (var i = 0; i < array_length(slot_names); i++) {
+        var slot_name = slot_names[i];
+        if (!variable_struct_exists(hero_equipment, slot_name)) {
+            continue;
+        }
+
+        var item_id = variable_struct_get(hero_equipment, slot_name);
+        if (item_id == -1) {
+            continue;
+        }
+
+        var item_data = ds_map_find_value(global.ItemDB, item_id);
+        if (item_data == -1) {
+            continue;
+        }
+
+        var set_id_item = item_data[? "set_id"];
+        if (!is_undefined(set_id_item) && set_id_item == set_id) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
+function is_item_equipped(item_id) {
+    if (!variable_global_exists("equipment_slots")) {
+        return false;
+    }
+
+    var hero_equipment = global.equipment_slots[0];
+    var slot_names = ["weapon", "armor", "accessory", "relic"];
+
+    for (var i = 0; i < array_length(slot_names); i++) {
+        var slot = slot_names[i];
+        if (variable_struct_exists(hero_equipment, slot) && variable_struct_get(hero_equipment, slot) == item_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function reset_equipment_set_bonuses() {
+    ensure_equipment_set_structs();
+
+    var fields = ["strength", "agility", "intelligence", "defense", "max_health", "gold_bonus", "health_bonus"];
+    for (var i = 0; i < array_length(fields); i++) {
+        var field = fields[i];
+        var previous = variable_struct_get(global.hero.equipment_set_bonuses, field);
+        if (!is_undefined(previous) && variable_struct_exists(global.hero.equipment_bonuses, field)) {
+            var current = variable_struct_get(global.hero.equipment_bonuses, field);
+            variable_struct_set(global.hero.equipment_bonuses, field, current - previous);
+        }
+        variable_struct_set(global.hero.equipment_set_bonuses, field, 0);
+    }
+
+    global.hero.active_sets = [];
+
+    global.equipment_set_effects.reward_multiplier = 1.0;
+    global.equipment_set_effects.speed_multiplier = 1.0;
+    global.equipment_set_effects.success_bonus = 0;
+}
+
+function apply_set_stat_bonus(field, value) {
+    if (value == 0) {
+        return;
+    }
+
+    if (!variable_struct_exists(global.hero.equipment_bonuses, field)) {
+        variable_struct_set(global.hero.equipment_bonuses, field, 0);
+    }
+
+    var current = variable_struct_get(global.hero.equipment_bonuses, field);
+    variable_struct_set(global.hero.equipment_bonuses, field, current + value);
+
+    var tracking = variable_struct_get(global.hero.equipment_set_bonuses, field);
+    variable_struct_set(global.hero.equipment_set_bonuses, field, tracking + value);
+}
+
+function apply_set_stats(stats_struct) {
+    if (!is_struct(stats_struct)) {
+        return;
+    }
+
+    if (variable_struct_exists(stats_struct, "strength")) apply_set_stat_bonus("strength", stats_struct.strength);
+    if (variable_struct_exists(stats_struct, "agility")) apply_set_stat_bonus("agility", stats_struct.agility);
+    if (variable_struct_exists(stats_struct, "intelligence")) apply_set_stat_bonus("intelligence", stats_struct.intelligence);
+    if (variable_struct_exists(stats_struct, "defense")) apply_set_stat_bonus("defense", stats_struct.defense);
+    if (variable_struct_exists(stats_struct, "max_health")) apply_set_stat_bonus("max_health", stats_struct.max_health);
+    if (variable_struct_exists(stats_struct, "gold_bonus")) apply_set_stat_bonus("gold_bonus", stats_struct.gold_bonus);
+    if (variable_struct_exists(stats_struct, "health_bonus")) apply_set_stat_bonus("health_bonus", stats_struct.health_bonus);
+}
+
+function apply_set_effects(effect_struct) {
+    if (!is_struct(effect_struct)) {
+        return;
+    }
+
+    if (variable_struct_exists(effect_struct, "reward_multiplier")) {
+        global.equipment_set_effects.reward_multiplier *= effect_struct.reward_multiplier;
+    }
+
+    if (variable_struct_exists(effect_struct, "speed_multiplier")) {
+        global.equipment_set_effects.speed_multiplier *= effect_struct.speed_multiplier;
+    }
+
+    if (variable_struct_exists(effect_struct, "success_bonus")) {
+        global.equipment_set_effects.success_bonus += effect_struct.success_bonus;
+    }
+}
+
+function update_equipment_set_bonuses() {
+    if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) {
+        return;
+    }
+
+    ensure_equipment_set_structs();
+    reset_equipment_set_bonuses();
+
+    if (!variable_global_exists("ItemSets") || !ds_exists(global.ItemSets, ds_type_map)) {
+        return;
+    }
+
+    if (!variable_global_exists("equipment_slots")) {
+        return;
+    }
+
+    var hero_equipment = global.equipment_slots[0];
+    var slot_names = ["weapon", "armor", "accessory", "relic"];
+    var set_counts = {};
+
+    for (var i = 0; i < array_length(slot_names); i++) {
+        var slot_name = slot_names[i];
+        if (!variable_struct_exists(hero_equipment, slot_name)) {
+            continue;
+        }
+
+        var item_id = variable_struct_get(hero_equipment, slot_name);
+        if (item_id == -1) {
+            continue;
+        }
+
+        var item_data = ds_map_find_value(global.ItemDB, item_id);
+        if (item_data == -1) {
+            continue;
+        }
+
+        var set_id = item_data[? "set_id"];
+        if (is_undefined(set_id) || set_id == "") {
+            continue;
+        }
+
+        if (!variable_struct_exists(set_counts, set_id)) {
+            variable_struct_set(set_counts, set_id, 0);
+        }
+        var current_count = variable_struct_get(set_counts, set_id);
+        variable_struct_set(set_counts, set_id, current_count + 1);
+    }
+
+    var set_ids = variable_struct_get_names(set_counts);
+    for (var s = 0; s < array_length(set_ids); s++) {
+        var set_id = set_ids[s];
+        var pieces_owned = variable_struct_get(set_counts, set_id);
+        var set_data = get_set_definition(set_id);
+        if (set_data == -1) {
+            continue;
+        }
+
+        var total_pieces = array_length(set_data[? "pieces"]);
+        var bonuses = set_data[? "bonuses"];
+        var unlocked_descriptions = [];
+        var next_description = "";
+
+        for (var b = 0; b < array_length(bonuses); b++) {
+            var bonus_entry = bonuses[b];
+            if (pieces_owned >= bonus_entry.count) {
+                apply_set_stats(bonus_entry.stats);
+                apply_set_effects(bonus_entry.effects);
+                array_push(unlocked_descriptions, bonus_entry.description);
+            } else if (next_description == "") {
+                next_description = string(bonus_entry.count) + " предмета: " + bonus_entry.description;
+            }
+        }
+
+        var summary = {
+            id: set_id,
+            name: set_data[? "name"],
+            theme: set_data[? "theme"],
+            description: set_data[? "description"],
+            owned: pieces_owned,
+            total: total_pieces,
+            unlocked: unlocked_descriptions,
+            next: next_description,
+            reward_multiplier: global.equipment_set_effects.reward_multiplier,
+            speed_multiplier: global.equipment_set_effects.speed_multiplier,
+            success_bonus: global.equipment_set_effects.success_bonus
+        };
+
+        array_push(global.hero.active_sets, summary);
+    }
+
+    if (variable_global_exists("update_hero_max_health")) {
+        update_hero_max_health();
     }
 }
 function debug_shop_items() {

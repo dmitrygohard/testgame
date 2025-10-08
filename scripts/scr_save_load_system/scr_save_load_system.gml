@@ -290,6 +290,13 @@ function game_data_load() {
         reapply_hero_artifact_effects();
     }
 
+    if (function_exists(ensure_equipment_set_structs)) {
+        ensure_equipment_set_structs();
+    }
+    if (function_exists(update_equipment_set_bonuses)) {
+        update_equipment_set_bonuses();
+    }
+
     // Загружаем трофеи
     if (ds_map_exists(global.game_data, "trophy_unlocked_json")) {
         var trophy_json = ds_map_find_value(global.game_data, "trophy_unlocked_json");
@@ -343,12 +350,16 @@ function load_game_state() {
     if (variable_global_exists("calculate_companion_bonuses")) {
         calculate_companion_bonuses();
     }
-    
+
     // Обновляем здоровье после загрузки
     if (variable_global_exists("update_hero_max_health")) {
         update_hero_max_health();
     }
-    
+
+    if (function_exists(update_equipment_set_bonuses)) {
+        update_equipment_set_bonuses();
+    }
+
     show_debug_message("Состояние игры загружено");
 }
 

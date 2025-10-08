@@ -206,16 +206,16 @@ function draw_expeditions_tab(x, y, width, height) {
         
         // Название и уровень
         draw_set_color(ui_text);
-        draw_text(x + 35, expedition_y, diff.name);
+        draw_text(x + 35, expedition_y + 60, diff.name);
         draw_set_color(ui_text_secondary);
-        draw_text(x + 35, expedition_y + 10, "Уровень " + string(diff.level));
+        draw_text(x + 350, expedition_y + 10, "Уровень " + string(diff.level));
         
         // Описание (сокращаем до 35 символов)
         draw_set_color(ui_text_secondary);
         draw_set_font(fnt_small);
         var short_desc = string_copy(diff.description, 1, 35);
         if (string_length(diff.description) > 35) short_desc += "...";
-        draw_text(x + 35, expedition_y + 20, short_desc);
+        draw_text(x + 35, expedition_y + 10, short_desc);
         draw_set_font(fnt_main);
         
         // Статистика

@@ -339,9 +339,21 @@ function start_expedition_direct(difficulty_index) {
         if (variable_global_exists("apply_companion_item_buffs_to_expedition")) {
             apply_companion_item_buffs_to_expedition();
         }
-        
+
+        if (variable_global_exists("equipment_set_effects") && is_struct(global.equipment_set_effects)) {
+            var set_effects = global.equipment_set_effects;
+            if (set_effects.speed_multiplier != 1.0) {
+                var clamped_speed = clamp(set_effects.speed_multiplier, 0.25, 1.0);
+                global.expedition.duration = max(60, round(global.expedition.duration * clamped_speed));
+            }
+
+            if (set_effects.success_bonus != 0) {
+                global.expedition.success_chance = clamp(global.expedition.success_chance + set_effects.success_bonus, 5, 95);
+            }
+        }
+
         add_notification("Экспедиция '" + diff.name + "' началась!");
-        
+
         show_debug_message("Экспедиция успешно запущена: " + diff.name + ", длительность: " + string(global.expedition.duration));
     } else {
         show_debug_message("Ошибка запуска экспедиции: active=" + string(global.expedition.active) + ", difficulty_index=" + string(difficulty_index));
@@ -999,7 +1011,12 @@ function complete_expedition() {
     // Базовые награды
     var gold_reward = irandom_range(diff.reward_min, diff.reward_max);
     var exp_reward = 25 * (global.expedition.difficulty + 1);
-    
+
+    var equipment_effects = undefined;
+    if (variable_global_exists("equipment_set_effects")) {
+        equipment_effects = global.equipment_set_effects;
+    }
+
     // Проверяем двойную атаку
     var is_double_attack = handle_double_attack();
     if (is_double_attack) {
@@ -1011,18 +1028,27 @@ function complete_expedition() {
     // Применяем множитель награды от Концепции Победы
     gold_reward = floor(gold_reward * global.expedition_reward_multiplier);
     exp_reward = floor(exp_reward * global.expedition_reward_multiplier);
-    
+
+    if (is_struct(equipment_effects)) {
+        gold_reward = floor(gold_reward * equipment_effects.reward_multiplier);
+        exp_reward = floor(exp_reward * equipment_effects.reward_multiplier);
+    }
+
     // Бонус от бафов и помощниц
     var gold_mod = get_buff_modifier(global.BUFF_TYPES.GOLD);
     gold_reward = gold_reward * (1 + gold_mod.additive / 100);
-    
+
     var companion_bonuses = get_active_companion_bonuses();
     gold_reward = gold_reward * (1 + companion_bonuses.gold / 100);
-    
+
     // БАФ ОТ ПРЕДМЕТОВ: Дисциплины (дополнительный бонус к золоту)
     var discipline_item_buff = get_companion_buff_modifier("discipline_gold");
     gold_reward = gold_reward * (1 + discipline_item_buff / 100);
-    
+
+    if (variable_struct_exists(global.hero.equipment_bonuses, "gold_bonus")) {
+        gold_reward = gold_reward * (1 + global.hero.equipment_bonuses.gold_bonus / 100);
+    }
+
     // БАФ ОТ ПРЕДМЕТОВ: Проверка удвоения награды
     var reward_multiplier = check_double_rewards_chance();
     gold_reward = floor(gold_reward * reward_multiplier);
@@ -1038,7 +1064,12 @@ function complete_expedition() {
         
         // Шанс выпадения предмета с учетом множителя
         var item_chance = 10 + (global.expedition.difficulty * 15);
-        if (random(100) < item_chance * global.expedition_reward_multiplier) {
+        var drop_multiplier = global.expedition_reward_multiplier;
+        if (is_struct(equipment_effects)) {
+            drop_multiplier *= equipment_effects.reward_multiplier;
+        }
+
+        if (random(100) < item_chance * drop_multiplier) {
             var item_id = get_random_expedition_item(global.expedition.difficulty);
             if (AddItemToInventory(item_id, 1)) {
                 var item_data = ds_map_find_value(global.ItemDB, item_id);
@@ -1047,7 +1078,7 @@ function complete_expedition() {
         }
         
         // Разблокировка помощницы при победе над боссом
-       if (global.expedition.boss_index != -1 && !global.companions[global.expedition.boss_index].unlocked) {
+        if (global.expedition.boss_index != -1 && !global.companions[global.expedition.boss_index].unlocked) {
             global.companions[global.expedition.boss_index].unlocked = true;
             global.arenas[global.expedition.boss_index].unlocked = true;
             add_notification("Помощница " + global.companions[global.expedition.boss_index].name + " присоединилась к отряду!");
@@ -1056,7 +1087,7 @@ function complete_expedition() {
         // Открытие следующей сложности
         if (global.expedition.difficulty == global.max_available_difficulty) {
             global.max_available_difficulty = min(global.max_available_difficulty + 1, array_length(global.expedition_difficulties) - 1);
-           if (global.max_available_difficulty < array_length(global.expedition_difficulties) - 1) {
+            if (global.max_available_difficulty < array_length(global.expedition_difficulties) - 1) {
                 var next_diff = global.expedition_difficulties[global.max_available_difficulty];
                 add_notification("Открыта новая сложность: " + next_diff.name + "!");
             }

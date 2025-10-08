@@ -392,6 +392,7 @@ function draw_inventory_tab(x, y, width, height) {
     if (!variable_global_exists("inv_scroll_dragging")) global.inv_scroll_dragging = false;
 
     global.inv_buttons = [];
+    global.inventory_hover_tooltip = undefined;
 
     var margin = 12;
     var content_gap = 24;
@@ -405,6 +406,8 @@ function draw_inventory_tab(x, y, width, height) {
 
     draw_equipment_section(equipment_x, y + margin, equipment_width, panel_height);
     draw_inventory_cards(inventory_x, y + margin, inventory_width, panel_height);
+
+    draw_inventory_tooltip();
 }
 
 function draw_inventory_cards(x, y, width, height) {
@@ -516,20 +519,29 @@ function draw_inventory_card(x, y, width, height, item_data, index, is_hovered) 
     draw_set_color(ui_text_secondary);
     draw_text(name_x, y + 24, inventory_get_item_tag(db_data));
 
-    var bonus_text = "";
-    if (db_data[? "strength_bonus"] != 0) bonus_text += "⚔ +" + string(db_data[? "strength_bonus"]) + "  ";
-    if (db_data[? "intelligence_bonus"] != 0) bonus_text += "🧠 +" + string(db_data[? "intelligence_bonus"]) + "  ";
-    if (db_data[? "defense_bonus"] != 0) bonus_text += "🛡 +" + string(db_data[? "defense_bonus"]);
+    if (is_hovered) {
+        inventory_register_tooltip(item_id, quantity, "inventory");
+    }
+
+    var stat_segments = inventory_collect_item_stats(db_data);
 
     draw_set_font(fnt_small);
-    if (bonus_text == "") {
-        var desc = string_copy(db_data[? "description"], 1, 50);
-        if (string_length(db_data[? "description"]) > 50) desc += "...";
-        draw_text(name_x, y + 42, desc);
+    if (array_length(stat_segments) > 0) {
+        draw_text(name_x, y + 42, array_join(stat_segments, "   "));
     } else {
-        draw_text(name_x, y + 42, bonus_text);
+        var desc = string_copy(db_data[? "description"], 1, 52);
+        if (string_length(db_data[? "description"]) > 52) desc += "...";
+        draw_text(name_x, y + 42, desc);
     }
     draw_set_font(fnt_main);
+
+    var set_progress_text = inventory_get_set_progress_text(item_id, db_data);
+    if (set_progress_text != "") {
+        draw_set_font(fnt_small);
+        draw_set_color(ui_text_secondary);
+        draw_text(name_x, y + height - 48, set_progress_text);
+        draw_set_font(fnt_main);
+    }
 
     var button_defs = [];
     var item_type = db_data[? "type"];
@@ -750,6 +762,10 @@ function draw_equipment_section(x, y, width, height) {
                 draw_text(slot_x + slot_size/2, slot_y + slot_size - 12, short_name);
                 draw_set_font(fnt_main);
                 draw_set_valign(fa_top);
+
+                if (hovered) {
+                    inventory_register_tooltip(item_id, 1, "equipment");
+                }
             }
         } else {
             draw_set_color(ui_text_secondary);
@@ -792,6 +808,39 @@ function draw_equipment_section(x, y, width, height) {
         draw_text(x + width/2, bonus_y, "Пока нет бонусов от экипировки");
     }
     draw_set_halign(fa_left);
+
+    var set_y = bonus_y + 26;
+    draw_set_font(fnt_small);
+    draw_set_color(ui_text_secondary);
+    if (variable_struct_exists(global.hero, "active_sets") && is_array(global.hero.active_sets) && array_length(global.hero.active_sets) > 0) {
+        for (var si = 0; si < array_length(global.hero.active_sets); si++) {
+            var set_info = global.hero.active_sets[si];
+            var header = set_info.name + " · " + string(set_info.owned) + "/" + string(set_info.total);
+            draw_set_color(set_info.owned >= set_info.total ? ui_highlight : ui_text_secondary);
+            draw_text(x + padding, set_y, header);
+            set_y += 16;
+
+            var unlocked = set_info.unlocked;
+            if (is_array(unlocked)) {
+                draw_set_color(ui_text_secondary);
+                for (var ui_line = 0; ui_line < array_length(unlocked); ui_line++) {
+                    draw_text(x + padding + 12, set_y, "• " + unlocked[ui_line]);
+                    set_y += 14;
+                }
+            }
+
+            if (set_info.next != "") {
+                draw_set_color(ui_text_secondary);
+                draw_text(x + padding + 12, set_y, "Следующая цель: " + set_info.next);
+                set_y += 16;
+            }
+
+            set_y += 4;
+        }
+    } else {
+        draw_text(x + padding, set_y, "Соберите предметы сетов для уникальных эффектов");
+    }
+    draw_set_font(fnt_main);
 }
 
 function inventory_get_rarity_color(rarity) {
@@ -822,6 +871,13 @@ function inventory_get_item_tag(db_data) {
     var rarity_names = ["Обычный", "Необычный", "Редкий", "Эпический", "Легендарный"];
     var rarity_index = clamp(db_data[? "rarity"], 0, array_length(rarity_names) - 1);
 
+    if (!is_undefined(db_data[? "set_id"]) && db_data[? "set_id"] != "" && function_exists(get_set_definition)) {
+        var set_data = get_set_definition(db_data[? "set_id"]);
+        if (set_data != -1) {
+            return "Часть сета «" + set_data[? "name"] + "» · " + rarity_names[rarity_index];
+        }
+    }
+
     switch(db_data[? "type"]) {
         case global.ITEM_TYPE.WEAPON: return "Оружие · " + rarity_names[rarity_index];
         case global.ITEM_TYPE.ARMOR: return "Броня · " + rarity_names[rarity_index];
@@ -833,6 +889,231 @@ function inventory_get_item_tag(db_data) {
             if (db_data[? "item_class"] == "trophy") return "Трофей · Единственный";
             return "Артефакт · " + rarity_names[rarity_index];
     }
+}
+
+function inventory_collect_item_stats(db_data) {
+    var segments = [];
+    if (db_data[? "strength_bonus"] != 0) array_push(segments, "⚔ +" + string(db_data[? "strength_bonus"]));
+    if (db_data[? "agility_bonus"] != 0) array_push(segments, "⚡ +" + string(db_data[? "agility_bonus"]));
+    if (db_data[? "intelligence_bonus"] != 0) array_push(segments, "🧠 +" + string(db_data[? "intelligence_bonus"]));
+    if (db_data[? "defense_bonus"] != 0) array_push(segments, "🛡 +" + string(db_data[? "defense_bonus"]));
+    if (db_data[? "max_health_bonus"] != 0) array_push(segments, "❤️ +" + string(db_data[? "max_health_bonus"]));
+    if (db_data[? "health_bonus"] != 0) array_push(segments, "🩸 +" + string(db_data[? "health_bonus"]));
+    if (db_data[? "gold_bonus"] != 0) array_push(segments, "💰 +" + string(db_data[? "gold_bonus"]) + "%");
+    return segments;
+}
+
+function inventory_get_set_progress_text(item_id, db_data) {
+    if (!function_exists(get_set_definition)) return "";
+    var set_id = db_data[? "set_id"];
+    if (is_undefined(set_id) || set_id == "") return "";
+
+    var set_data = get_set_definition(set_id);
+    if (set_data == -1) return "";
+
+    var total = array_length(set_data[? "pieces"]);
+    var equipped = function_exists(get_equipped_set_piece_count) ? get_equipped_set_piece_count(set_id) : 0;
+    var preview = equipped;
+    if (function_exists(is_item_equipped) && !is_item_equipped(item_id)) {
+        preview = min(total, equipped + 1);
+    }
+
+    var progress_text = set_data[? "name"] + " · " + string(equipped) + "/" + string(total);
+    if (preview > equipped && preview <= total) {
+        progress_text += " (→ " + string(preview) + ")";
+    }
+
+    return progress_text;
+}
+
+function inventory_register_tooltip(item_id, quantity, source) {
+    if (is_undefined(item_id)) return;
+
+    var tip = {
+        item_id: item_id,
+        quantity: max(1, quantity),
+        source: source,
+        anchor_x: mouse_x + 24,
+        anchor_y: mouse_y + 24
+    };
+
+    global.inventory_hover_tooltip = tip;
+}
+
+function draw_inventory_tooltip() {
+    if (!variable_global_exists("inventory_hover_tooltip")) return;
+    var tip = global.inventory_hover_tooltip;
+    if (!is_struct(tip)) return;
+
+    var item_id = tip.item_id;
+    if (is_undefined(item_id)) return;
+
+    if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) return;
+    var db_data = ds_map_find_value(global.ItemDB, item_id);
+    if (db_data == -1) return;
+
+    var width = 320;
+    var padding = 12;
+    var text_width = width - padding * 2;
+    var line_gap = 6;
+
+    var name = db_data[? "name"];
+    var tag_text = inventory_get_item_tag(db_data);
+    var description = db_data[? "description"];
+    if (is_undefined(description)) description = "";
+
+    var stats = inventory_collect_item_stats(db_data);
+    var stats_height = array_length(stats) > 0 ? 18 : 0;
+    var desc_height = string_length(description) > 0 ? string_height_ext(description, 4, text_width) : 0;
+
+    var piece_text = "";
+    if (!is_undefined(db_data[? "set_piece_name"]) && db_data[? "set_piece_name"] != "") {
+        piece_text = "Часть: " + db_data[? "set_piece_name"];
+    }
+
+    var set_lines = [];
+    if (function_exists(get_set_definition)) {
+        var set_id = db_data[? "set_id"];
+        if (!is_undefined(set_id) && set_id != "") {
+            var set_data = get_set_definition(set_id);
+            if (set_data != -1) {
+                var total = array_length(set_data[? "pieces"]);
+                var equipped = function_exists(get_equipped_set_piece_count) ? get_equipped_set_piece_count(set_id) : 0;
+                var preview = equipped;
+                if (function_exists(is_item_equipped) && !is_item_equipped(item_id)) {
+                    preview = min(total, equipped + 1);
+                }
+
+                var header = set_data[? "name"] + " · " + string(equipped) + "/" + string(total);
+                if (preview > equipped && preview <= total) {
+                    header += " (→ " + string(preview) + ")";
+                }
+                array_push(set_lines, { text: header, color: ui_highlight });
+
+                var bonuses = set_data[? "bonuses"];
+                for (var b = 0; b < array_length(bonuses); b++) {
+                    var entry = bonuses[b];
+                    var bonus_text = string(entry.count) + " предмета: " + entry.description;
+                    var unlocked = (equipped >= entry.count);
+                    var upcoming = (!unlocked && preview >= entry.count);
+                    var line_color = unlocked ? ui_text : (upcoming ? ui_highlight : ui_text_secondary);
+                    array_push(set_lines, { text: bonus_text, color: line_color });
+                }
+
+                var set_desc = set_data[? "description"];
+                if (!is_undefined(set_desc) && string_length(set_desc) > 0) {
+                    array_push(set_lines, { text: set_desc, color: ui_text_secondary });
+                }
+            }
+        }
+    }
+
+    var set_height = array_length(set_lines) * 16;
+
+    var trophy_text = "";
+    if (db_data[? "type"] == global.ITEM_TYPE.TROPHY || db_data[? "item_class"] == "trophy") {
+        trophy_text = db_data[? "trophy_condition"];
+        if ((is_undefined(trophy_text) || trophy_text == "") && function_exists(get_trophy_definition)) {
+            var trophy_data = get_trophy_definition(item_id);
+            if (trophy_data != undefined) {
+                trophy_text = trophy_data.condition;
+            }
+        }
+        if (is_undefined(trophy_text)) trophy_text = "";
+    }
+    var trophy_height = trophy_text != "" ? string_height_ext(trophy_text, 4, text_width) : 0;
+
+    var quantity_text = "";
+    if (db_data[? "stackable"]) {
+        quantity_text = "В стопке: " + string(tip.quantity);
+    }
+
+    var total_height = padding * 2 + 24 + 18;
+    if (stats_height > 0) total_height += line_gap + stats_height;
+    if (desc_height > 0) total_height += line_gap + desc_height;
+    if (piece_text != "") total_height += line_gap + 16;
+    if (set_height > 0) total_height += line_gap + set_height;
+    if (trophy_height > 0) total_height += line_gap + trophy_height;
+    if (quantity_text != "") total_height += line_gap + 16;
+
+    var screen_w = variable_global_exists("screen_width") ? global.screen_width : display_get_gui_width();
+    var screen_h = variable_global_exists("screen_height") ? global.screen_height : display_get_gui_height();
+
+    var final_x = tip.anchor_x;
+    var final_y = tip.anchor_y;
+
+    if (final_x + width > screen_w - 12) final_x = screen_w - width - 12;
+    if (final_y + total_height > screen_h - 12) final_y = screen_h - total_height - 12;
+    final_x = max(12, final_x);
+    final_y = max(12, final_y);
+
+    var rarity_color = inventory_get_rarity_color(db_data[? "rarity"]);
+
+    draw_set_color(ui_bg_dark);
+    draw_rectangle(final_x, final_y, final_x + width, final_y + total_height, false);
+    draw_set_color(rarity_color);
+    draw_rectangle(final_x, final_y, final_x + width, final_y + 4, false);
+    draw_set_color(ui_border_color);
+    draw_rectangle(final_x, final_y, final_x + width, final_y + total_height, true);
+
+    var cursor_y = final_y + padding;
+    draw_set_color(c_white);
+    draw_set_halign(fa_left);
+    draw_set_font(fnt_main);
+    draw_text(final_x + padding, cursor_y, name);
+    cursor_y += 24;
+
+    draw_set_font(fnt_small);
+    draw_set_color(ui_text_secondary);
+    draw_text(final_x + padding, cursor_y, tag_text);
+    cursor_y += 18;
+
+    if (array_length(stats) > 0) {
+        cursor_y += line_gap;
+        draw_set_color(ui_text);
+        draw_text(final_x + padding, cursor_y, array_join(stats, "   "));
+        cursor_y += 18;
+    }
+
+    if (desc_height > 0) {
+        cursor_y += line_gap;
+        draw_set_color(ui_text_secondary);
+        draw_text_ext(final_x + padding, cursor_y, description, 4, text_width);
+        cursor_y += desc_height;
+    }
+
+    if (piece_text != "") {
+        cursor_y += line_gap;
+        draw_set_color(ui_text_secondary);
+        draw_text(final_x + padding, cursor_y, piece_text);
+        cursor_y += 16;
+    }
+
+    if (set_height > 0) {
+        cursor_y += line_gap;
+        for (var sl = 0; sl < array_length(set_lines); sl++) {
+            var line = set_lines[sl];
+            draw_set_color(line.color);
+            draw_text(final_x + padding, cursor_y, line.text);
+            cursor_y += 16;
+        }
+    }
+
+    if (trophy_height > 0) {
+        cursor_y += line_gap;
+        draw_set_color(ui_highlight);
+        draw_text_ext(final_x + padding, cursor_y, trophy_text, 4, text_width);
+        cursor_y += trophy_height;
+    }
+
+    if (quantity_text != "") {
+        cursor_y += line_gap;
+        draw_set_color(ui_text_secondary);
+        draw_text(final_x + padding, cursor_y, quantity_text);
+    }
+
+    draw_set_font(fnt_main);
+    draw_set_color(c_white);
 }
 
 function draw_shop_tab(x, y, width, height) {
