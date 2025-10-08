@@ -293,9 +293,7 @@ function game_data_load() {
     if (function_exists(ensure_equipment_set_structs)) {
         ensure_equipment_set_structs();
     }
-    if (function_exists(update_equipment_set_bonuses)) {
-        update_equipment_set_bonuses();
-    }
+      update_equipment_set_bonuses();
 
     // Загружаем трофеи
     if (ds_map_exists(global.game_data, "trophy_unlocked_json")) {
@@ -356,9 +354,7 @@ function load_game_state() {
         update_hero_max_health();
     }
 
-    if (function_exists(update_equipment_set_bonuses)) {
-        update_equipment_set_bonuses();
-    }
+    update_equipment_set_bonuses();
 
     show_debug_message("Состояние игры загружено");
 }

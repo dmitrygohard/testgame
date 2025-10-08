@@ -697,141 +697,17 @@ function draw_inventory_scrollbar(x, y, width, height, total_content_height, vis
 }
 
 function draw_equipment_section(x, y, width, height) {
-    draw_set_color(ui_bg_dark);
-    draw_rectangle(x, y, x + width, y + height, false);
-    draw_set_color(ui_border_color);
-    draw_rectangle(x, y, x + width, y + height, true);
 
-    var padding = 14;
-    draw_set_color(ui_text);
-    draw_text(x + padding, y + 6, "Снаряжение героя");
-
-    var portrait_cx = x + width / 2;
-    var portrait_cy = y + 70;
-    var portrait_r = 40;
-
-    draw_set_color(make_color_rgb(55, 65, 95));
-    draw_circle(portrait_cx, portrait_cy, portrait_r + 4, false);
-    draw_set_color(merge_color(ui_highlight, c_white, 0.35));
-    draw_circle(portrait_cx, portrait_cy, portrait_r, false);
-    draw_set_color(c_white);
-    draw_set_halign(fa_center);
-    draw_set_valign(fa_middle);
-    draw_text(portrait_cx, portrait_cy - 4, "🛡️");
-    draw_set_valign(fa_top);
-
-    var hero_equipment = global.equipment_slots[0];
-    var slot_size = 72;
-    var slot_gap = 26;
-    var grid_width = slot_size * 2 + slot_gap;
-    var grid_x = x + (width - grid_width) / 2;
-    var grid_y = portrait_cy + portrait_r + 20;
-
-    var slots = [
-        { type: "weapon", name: "Оружие", col: 0, row: 0 },
-        { type: "armor", name: "Броня", col: 1, row: 0 },
-        { type: "accessory", name: "Аксессуар", col: 0, row: 1 },
-        { type: "relic", name: "Реликвия", col: 1, row: 1 }
-    ];
-
-    for (var i = 0; i < array_length(slots); i++) {
-        var slot = slots[i];
-        var slot_x = grid_x + slot.col * (slot_size + slot_gap);
-        var slot_y = grid_y + slot.row * (slot_size + slot_gap);
-        var item_id = variable_struct_get(hero_equipment, slot.type);
-        var filled = (item_id != -1);
-        var hovered = point_in_rectangle(mouse_x, mouse_y, slot_x, slot_y, slot_x + slot_size, slot_y + slot_size);
-
-        var slot_color = filled ? merge_color(ui_highlight, c_white, hovered ? 0.35 : 0.2) : merge_color(ui_bg_dark, c_white, hovered ? 0.25 : 0.1);
-        draw_set_color(slot_color);
-        draw_rectangle(slot_x, slot_y, slot_x + slot_size, slot_y + slot_size, false);
-        draw_set_color(ui_border_color);
-        draw_rectangle(slot_x, slot_y, slot_x + slot_size, slot_y + slot_size, true);
-
-        if (filled) {
-            var slot_item = ds_map_find_value(global.ItemDB, item_id);
-            if (slot_item != -1) {
-                draw_set_color(c_white);
-                draw_set_halign(fa_center);
-                draw_set_valign(fa_middle);
-                draw_text(slot_x + slot_size/2, slot_y + slot_size/2 - 8, inventory_get_item_icon(slot_item));
-
-                var short_name = string_copy(slot_item[? "name"], 1, 10);
-                draw_set_color(ui_text_secondary);
-                draw_set_font(fnt_small);
-                draw_text(slot_x + slot_size/2, slot_y + slot_size - 12, short_name);
-                draw_set_font(fnt_main);
-                draw_set_valign(fa_top);
-
-                if (hovered) {
-                    inventory_register_tooltip(item_id, 1, "equipment");
-                }
-            }
-        } else {
-            draw_set_color(ui_text_secondary);
-            draw_set_halign(fa_center);
-            draw_set_valign(fa_middle);
-            draw_text(slot_x + slot_size/2, slot_y + slot_size/2, "+");
-            draw_set_valign(fa_top);
-        }
-
-        draw_set_color(ui_text);
-        draw_set_halign(fa_center);
-        draw_text(slot_x + slot_size/2, slot_y + slot_size + 6, slot.name);
-        draw_set_halign(fa_left);
-
-        array_push(global.inv_buttons, {
-            type: "equip_slot",
-            hero_index: 0,
-            slot_type: slot.type,
-            x1: slot_x, y1: slot_y,
-            x2: slot_x + slot_size, y2: slot_y + slot_size
-        });
-    }
-
-    var bonus_y = grid_y + slot_size * 2 + slot_gap + 20;
-    var info_lines = [];
-    if (global.hero.equipment_bonuses.strength > 0) array_push(info_lines, "Сила +" + string(global.hero.equipment_bonuses.strength));
-    if (global.hero.equipment_bonuses.intelligence > 0) array_push(info_lines, "Интеллект +" + string(global.hero.equipment_bonuses.intelligence));
-    if (global.hero.equipment_bonuses.defense > 0) array_push(info_lines, "Защита +" + string(global.hero.equipment_bonuses.defense));
-
-    draw_set_color(ui_text_secondary);
-    draw_set_halign(fa_center);
-    if (array_length(info_lines) > 0) {
-        var info_text = "";
-        for (var bi = 0; bi < array_length(info_lines); bi++) {
-            info_text += info_lines[bi];
-            if (bi < array_length(info_lines) - 1) info_text += "   ";
-        }
-        draw_text(x + width/2, bonus_y, info_text);
-    } else {
-        draw_text(x + width/2, bonus_y, "Пока нет бонусов от экипировки");
-    }
-    draw_set_halign(fa_left);
-
-    var set_y = bonus_y + 26;
-    draw_set_font(fnt_small);
-    draw_set_color(ui_text_secondary);
-    if (variable_struct_exists(global.hero, "active_sets") && is_array(global.hero.active_sets) && array_length(global.hero.active_sets) > 0) {
-        for (var si = 0; si < array_length(global.hero.active_sets); si++) {
-            var set_info = global.hero.active_sets[si];
-            var header = set_info.name + " · " + string(set_info.owned) + "/" + string(set_info.total);
-            draw_set_color(set_info.owned >= set_info.total ? ui_highlight : ui_text_secondary);
-            draw_text(x + padding, set_y, header);
-            set_y += 16;
-
-            var unlocked = set_info.unlocked;
-            if (is_array(unlocked)) {
-                draw_set_color(ui_text_secondary);
-                for (var ui_line = 0; ui_line < array_length(unlocked); ui_line++) {
-                    draw_text(x + padding + 12, set_y, "• " + unlocked[ui_line]);
-                    set_y += 14;
-                }
+           var next_goal = "";
+            if (is_struct(set_info) && variable_struct_exists(set_info, "next")) {
+                next_goal = set_info.next;
+            } else if (ds_exists(set_info, ds_type_map) && ds_map_exists(set_info, "next")) {
+                next_goal = set_info[? "next"];
             }
 
-            if (set_info.next != "") {
+            if (!is_undefined(next_goal) && next_goal != "") {
                 draw_set_color(ui_text_secondary);
-                draw_text(x + padding + 12, set_y, "Следующая цель: " + set_info.next);
+                                draw_text(x + padding + 12, set_y, "Следующая цель: " + string(next_goal));
                 set_y += 16;
             }
 
@@ -843,6 +719,7 @@ function draw_equipment_section(x, y, width, height) {
     draw_set_font(fnt_main);
 }
 
+
 function inventory_get_rarity_color(rarity) {
     switch(rarity) {
         case 0: return make_color_rgb(70, 75, 95);
@@ -853,8 +730,37 @@ function inventory_get_rarity_color(rarity) {
     }
 }
 
+function inventory_source_has_key(db_data, key) {
+    if (is_undefined(db_data)) {
+        return false;
+    }
+
+    if (ds_exists(db_data, ds_type_map)) {
+        return ds_map_exists(db_data, key);
+    }
+
+    if (is_struct(db_data)) {
+        return variable_struct_exists(db_data, key);
+    }
+
+    return false;
+}
+
+function inventory_source_get(db_data, key, default_value) {
+    if (inventory_source_has_key(db_data, key)) {
+        if (ds_exists(db_data, ds_type_map)) {
+            return db_data[? key];
+        }
+        return variable_struct_get(db_data, key);
+    }
+
+    return default_value;
+}
+
 function inventory_get_item_icon(db_data) {
-    switch(db_data[? "type"]) {
+    var item_type = inventory_source_get(db_data, "type", -1);
+
+    switch(item_type) {
         case global.ITEM_TYPE.WEAPON: return "⚔️";
         case global.ITEM_TYPE.ARMOR: return "🛡️";
         case global.ITEM_TYPE.ACCESSORY: return "💍";
@@ -862,13 +768,33 @@ function inventory_get_item_icon(db_data) {
         case global.ITEM_TYPE.SCROLL: return "📜";
         case global.ITEM_TYPE.TROPHY: return "🏆";
         default:
-            if (db_data[? "item_class"] == "trophy") return "🏆";
+            if (inventory_source_get(db_data, "item_class", "") == "trophy") return "🏆";
             return "🎁";
     }
 }
 
 function inventory_get_item_tag(db_data) {
-    switch(db_data[? "type"]) {
+    var rarity_names = ["Обычный", "Необычный", "Редкий", "Эпический", "Легендарный"];
+    var rarity_value = inventory_source_get(db_data, "rarity", 0);
+
+    if (!is_real(rarity_value)) {
+        rarity_value = 0;
+    }
+
+    var rarity_index = clamp(floor(rarity_value), 0, array_length(rarity_names) - 1);
+
+    var set_id = inventory_source_get(db_data, "set_id", "");
+
+    if (set_id != "" && function_exists(get_set_definition)) {
+        var set_data = get_set_definition(set_id);
+        if (set_data != -1) {
+            return "Часть сета «" + set_data[? "name"] + "» · " + rarity_names[rarity_index];
+        }
+    }
+
+    var item_type = inventory_source_get(db_data, "type", -1);
+
+    switch(item_type) {
         case global.ITEM_TYPE.WEAPON: return "Оружие · " + rarity_names[rarity_index];
         case global.ITEM_TYPE.ARMOR: return "Броня · " + rarity_names[rarity_index];
         case global.ITEM_TYPE.ACCESSORY: return "Аксессуар · " + rarity_names[rarity_index];
@@ -876,20 +802,35 @@ function inventory_get_item_tag(db_data) {
         case global.ITEM_TYPE.SCROLL: return "Свиток · " + rarity_names[rarity_index];
         case global.ITEM_TYPE.TROPHY: return "Трофей · Единственный";
         default:
-            if (db_data[? "item_class"] == "trophy") return "Трофей · Единственный";
+            if (inventory_source_get(db_data, "item_class", "") == "trophy") return "Трофей · Единственный";
             return "Артефакт · " + rarity_names[rarity_index];
     }
 }
 
 function inventory_collect_item_stats(db_data) {
     var segments = [];
-    if (db_data[? "strength_bonus"] != 0) array_push(segments, "⚔ +" + string(db_data[? "strength_bonus"]));
-    if (db_data[? "agility_bonus"] != 0) array_push(segments, "⚡ +" + string(db_data[? "agility_bonus"]));
-    if (db_data[? "intelligence_bonus"] != 0) array_push(segments, "🧠 +" + string(db_data[? "intelligence_bonus"]));
-    if (db_data[? "defense_bonus"] != 0) array_push(segments, "🛡 +" + string(db_data[? "defense_bonus"]));
-    if (db_data[? "max_health_bonus"] != 0) array_push(segments, "❤️ +" + string(db_data[? "max_health_bonus"]));
-    if (db_data[? "health_bonus"] != 0) array_push(segments, "🩸 +" + string(db_data[? "health_bonus"]));
-    if (db_data[? "gold_bonus"] != 0) array_push(segments, "💰 +" + string(db_data[? "gold_bonus"]) + "%");
+
+    var strength_bonus = inventory_source_get(db_data, "strength_bonus", 0);
+    if (strength_bonus != 0) array_push(segments, "⚔ +" + string(strength_bonus));
+
+    var agility_bonus = inventory_source_get(db_data, "agility_bonus", 0);
+    if (agility_bonus != 0) array_push(segments, "⚡ +" + string(agility_bonus));
+
+    var intelligence_bonus = inventory_source_get(db_data, "intelligence_bonus", 0);
+    if (intelligence_bonus != 0) array_push(segments, "🧠 +" + string(intelligence_bonus));
+
+    var defense_bonus = inventory_source_get(db_data, "defense_bonus", 0);
+    if (defense_bonus != 0) array_push(segments, "🛡 +" + string(defense_bonus));
+
+    var max_health_bonus = inventory_source_get(db_data, "max_health_bonus", 0);
+    if (max_health_bonus != 0) array_push(segments, "❤️ +" + string(max_health_bonus));
+
+    var health_bonus = inventory_source_get(db_data, "health_bonus", 0);
+    if (health_bonus != 0) array_push(segments, "🩸 +" + string(health_bonus));
+
+    var gold_bonus = inventory_source_get(db_data, "gold_bonus", 0);
+    if (gold_bonus != 0) array_push(segments, "💰 +" + string(gold_bonus) + "%");
+
     return segments;
 }
 
@@ -898,127 +839,106 @@ function inventory_collect_special_effects(db_data) {
     var highlight = variable_global_exists("ui_highlight") ? ui_highlight : c_aqua;
     var accent = variable_global_exists("ui_accent") ? ui_accent : highlight;
 
-    if (ds_map_exists(db_data, "companion_buff")) {
-        var buff_type = db_data[? "companion_buff"];
-        if (!is_undefined(buff_type) && buff_type != "") {
-            var details = "";
-            if (ds_map_exists(db_data, "companion_buff_description")) {
-                details = db_data[? "companion_buff_description"];
-            }
-            if (details == "" && ds_map_exists(db_data, "buff_power")) {
-                var powerx = db_data[? "buff_power"];
-                switch (buff_type) {
-                    case "hepo_success":
-                        details = "🎯 +" + string(power) + "% к шансу успеха экспедиций.";
-                        break;
-                    case "fatty_health":
-                        details = "🍰 +" + string(power) + "% к здоровью отряда.";
-                        break;
-                    case "discipline_gold":
-                        details = "💰 +" + string(power) + "% к наградам экспедиций.";
-                        break;
-                    case "all_buffs_boost":
-                        details = "✨ Усиление всех бафов помощниц на +" + string(power) + "%";
-                        break;
-                    case "expedition_speed":
-                        details = "🧭 Сокращает длительность экспедиции на " + string(power) + "%";
-                        break;
-                    case "double_rewards":
-                        details = "🎲 " + string(power) + "% шанс удвоить награды.";
-                        break;
-                }
-            }
-            if (details != "") {
-                array_push(lines, { text: details, color: highlight });
+    var buff_type = inventory_source_get(db_data, "companion_buff", "");
+    if (buff_type != "") {
+        var details = inventory_source_get(db_data, "companion_buff_description", "");
+        if (details == "") {
+            var power = inventory_source_get(db_data, "buff_power", 0);
+            switch (buff_type) {
+                case "hepo_success":
+                    details = "🎯 +" + string(power) + "% к шансу успеха экспедиций.";
+                    break;
+                case "fatty_health":
+                    details = "🍰 +" + string(power) + "% к здоровью отряда.";
+                    break;
+                case "discipline_gold":
+                    details = "💰 +" + string(power) + "% к наградам экспедиций.";
+                    break;
+                case "all_buffs_boost":
+                    details = "✨ Усиление всех бафов помощниц на +" + string(power) + "%";
+                    break;
+                case "expedition_speed":
+                    details = "🧭 Сокращает длительность экспедиции на " + string(power) + "%";
+                    break;
+                case "double_rewards":
+                    details = "🎲 " + string(power) + "% шанс удвоить награды.";
+                    break;
             }
         }
-    }
 
-    if (ds_map_exists(db_data, "health")) {
-        var heal = db_data[? "health"];
-        if (heal > 0) {
-            array_push(lines, { text: "💖 Мгновенно лечит " + string(heal) + " здоровья.", color: accent });
+        if (details != "") {
+            array_push(lines, { text: details, color: highlight });
         }
     }
 
-    if (ds_map_exists(db_data, "temp_strength")) {
-        var temp_strength = db_data[? "temp_strength"];
-        if (temp_strength > 0) {
-            array_push(lines, { text: "💪 +" + string(temp_strength) + " силы на 30 секунд.", color: accent });
-        }
+    var heal = inventory_source_get(db_data, "health", 0);
+    if (heal > 0) {
+        array_push(lines, { text: "💖 Мгновенно лечит " + string(heal) + " здоровья.", color: accent });
     }
 
-    if (ds_map_exists(db_data, "temp_agility")) {
-        var temp_agility = db_data[? "temp_agility"];
-        if (temp_agility > 0) {
-            array_push(lines, { text: "⚡ +" + string(temp_agility) + " ловкости на 30 секунд.", color: accent });
-        }
+    var temp_strength = inventory_source_get(db_data, "temp_strength", 0);
+    if (temp_strength > 0) {
+        array_push(lines, { text: "💪 +" + string(temp_strength) + " силы на 30 секунд.", color: accent });
     }
 
-    if (ds_map_exists(db_data, "temp_intelligence")) {
-        var temp_intelligence = db_data[? "temp_intelligence"];
-        if (temp_intelligence > 0) {
-            array_push(lines, { text: "🧠 +" + string(temp_intelligence) + " интеллекта на 30 секунд.", color: accent });
-        }
+    var temp_agility = inventory_source_get(db_data, "temp_agility", 0);
+    if (temp_agility > 0) {
+        array_push(lines, { text: "⚡ +" + string(temp_agility) + " ловкости на 30 секунд.", color: accent });
     }
 
-    if (ds_map_exists(db_data, "temp_defense")) {
-        var temp_defense = db_data[? "temp_defense"];
-        if (temp_defense > 0) {
-            array_push(lines, { text: "🛡️ +" + string(temp_defense) + " защиты на 30 секунд.", color: accent });
-        }
+    var temp_intelligence = inventory_source_get(db_data, "temp_intelligence", 0);
+    if (temp_intelligence > 0) {
+        array_push(lines, { text: "🧠 +" + string(temp_intelligence) + " интеллекта на 30 секунд.", color: accent });
     }
 
-    if (ds_map_exists(db_data, "expedition_success_bonus")) {
-        var success_bonus = db_data[? "expedition_success_bonus"];
-        if (success_bonus > 0) {
-            array_push(lines, { text: "🎯 +" + string(success_bonus) + "% к шансу успеха следующей экспедиции.", color: highlight });
-        }
+    var temp_defense = inventory_source_get(db_data, "temp_defense", 0);
+    if (temp_defense > 0) {
+        array_push(lines, { text: "🛡️ +" + string(temp_defense) + " защиты на 30 секунд.", color: accent });
     }
 
-    if (ds_map_exists(db_data, "expedition_gold_bonus")) {
-        var gold_bonus = db_data[? "expedition_gold_bonus"];
-        if (gold_bonus > 0) {
-            array_push(lines, { text: "💰 +" + string(gold_bonus) + "% к наградам следующей экспедиции.", color: highlight });
-        }
+    var success_bonus = inventory_source_get(db_data, "expedition_success_bonus", 0);
+    if (success_bonus > 0) {
+        array_push(lines, { text: "🎯 +" + string(success_bonus) + "% к шансу успеха следующей экспедиции.", color: highlight });
     }
 
-    if (ds_map_exists(db_data, "instant_complete")) {
-        if (db_data[? "instant_complete"]) {
-            array_push(lines, { text: "📜 Мгновенно завершает текущую экспедицию.", color: highlight });
-        }
+    var gold_bonus = inventory_source_get(db_data, "expedition_gold_bonus", 0);
+    if (gold_bonus > 0) {
+        array_push(lines, { text: "💰 +" + string(gold_bonus) + "% к наградам следующей экспедиции.", color: highlight });
     }
 
-    if (ds_map_exists(db_data, "defense_multiplier")) {
-        var defense_mult = db_data[? "defense_multiplier"];
-        if (defense_mult > 0) {
-            var def_percent = round((defense_mult - 1) * 100);
-            array_push(lines, { text: "🛡️ +" + string(def_percent) + "% к защите на одну экспедицию.", color: highlight });
-        }
+    if (inventory_source_get(db_data, "instant_complete", false)) {
+        array_push(lines, { text: "📜 Мгновенно завершает текущую экспедицию.", color: highlight });
     }
 
-    if (ds_map_exists(db_data, "reward_multiplier")) {
-        var reward_mult = db_data[? "reward_multiplier"];
-        if (reward_mult > 0) {
-            var reward_percent = round((reward_mult - 1) * 100);
-            array_push(lines, { text: "💎 +" + string(reward_percent) + "% к наградам следующей экспедиции.", color: highlight });
-        }
+    var defense_mult = inventory_source_get(db_data, "defense_multiplier", 0);
+    if (defense_mult > 0) {
+        var def_percent = round((defense_mult - 1) * 100);
+        array_push(lines, { text: "🛡️ +" + string(def_percent) + "% к защите на одну экспедицию.", color: highlight });
     }
 
-    if (ds_map_exists(db_data, "expedition_speed")) {
-        var speed_value = db_data[? "expedition_speed"];
-        if (speed_value > 0) {
-            var speed_text = "⚡ Ускоряет экспедицию.";
-            var percent_value = 0;
-            if (speed_value < 1) {
-                percent_value = round((1 - speed_value) * 100);
-                speed_text = "⚡ Сокращает длительность экспедиции на " + string(percent_value) + "%";
-            } else {
-                percent_value = round(speed_value);
-                speed_text = "⚡ Ускоряет экспедицию на " + string(percent_value) + "%";
-            }
-            array_push(lines, { text: speed_text, color: highlight });
+    var reward_mult = inventory_source_get(db_data, "reward_multiplier", 0);
+    if (reward_mult > 0) {
+        var reward_percent = round((reward_mult - 1) * 100);
+        array_push(lines, { text: "💎 +" + string(reward_percent) + "% к наградам следующей экспедиции.", color: highlight });
+    }
+
+    var speed_value = inventory_source_get(db_data, "expedition_speed", 0);
+    if (speed_value > 0) {
+        var speed_text = "⚡ Ускоряет экспедицию.";
+        var percent_value = 0;
+        if (speed_value < 1) {
+            percent_value = round((1 - speed_value) * 100);
+            speed_text = "⚡ Сокращает длительность экспедиции на " + string(percent_value) + "%";
+        } else {
+            percent_value = round(speed_value);
+            speed_text = "⚡ Ускоряет экспедицию на " + string(percent_value) + "%";
         }
+        array_push(lines, { text: speed_text, color: highlight });
+    }
+
+    var trophy_condition = inventory_source_get(db_data, "trophy_condition", "");
+    if (trophy_condition != "") {
+        array_push(lines, { text: "Условие получения: " + trophy_condition, color: highlight });
     }
 
     return lines;
@@ -1044,8 +964,7 @@ function inventory_get_set_progress_text(item_id, db_data) {
         progress_text += " (→ " + string(preview) + ")";
     }
 
-    return progress_text;
-}
+
 
 function inventory_register_tooltip(item_id, quantity, source) {
     if (is_undefined(item_id)) return;
