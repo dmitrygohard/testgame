@@ -914,12 +914,12 @@ function scr_init_item_database() {
         { id: "aurora_relic", name: "Реликвия рассвета", type: global.ITEM_TYPE.RELIC, price: 920, desc: "Сияние усиливает магические навыки.", intelligence: 4, defense: 2, slot: global.EQUIP_SLOT.RELIC, rarity: 2 },
         { id: "stoneward_idol", name: "Идол каменного стража", type: global.ITEM_TYPE.RELIC, price: 960, desc: "Призывает терпение древних големов.", defense: 5, max_health: 40, slot: global.EQUIP_SLOT.RELIC, rarity: 2 },
         { id: "echoing_compass", name: "Отголосочный компас", type: global.ITEM_TYPE.RELIC, price: 980, desc: "Ведёт к скрытым артефактам.", gold: 10, defense: 2, slot: global.EQUIP_SLOT.RELIC, rarity: 2 },
-        { id: "hepo_ancient_tome", name: "Древний фолиант Хэпо", type: global.ITEM_TYPE.ACCESSORY, price: 1500, desc: "Хэпо изучает забытые тактики, усиливая отряд.", intelligence: 8, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 3 },
-        { id: "fatty_energy_crystal", name: "Энергетический кристалл Фэтти", type: global.ITEM_TYPE.ACCESSORY, price: 1600, desc: "Хранит сладкую энергию для длинных походов.", defense: 3, max_health: 60, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 3 },
-        { id: "discipline_golden_scale", name: "Золотые весы Дисциплины", type: global.ITEM_TYPE.ACCESSORY, price: 1550, desc: "Отмеряет выгоду каждой экспедиции.", intelligence: 4, gold: 12, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 3 },
-        { id: "trinity_medallion", name: "Медальон троицы", type: global.ITEM_TYPE.ACCESSORY, price: 5200, desc: "Синхронизирует такт всех помощниц.", strength: 5, intelligence: 5, defense: 5, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4 },
-        { id: "expedition_compass", name: "Компас экспедиций", type: global.ITEM_TYPE.ACCESSORY, price: 4800, desc: "Показывает кратчайший путь через хаос.", agility: 2, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4 },
-        { id: "lucky_dice", name: "Игральные кости удачи", type: global.ITEM_TYPE.ACCESSORY, price: 4900, desc: "Каждый бросок в пользу отряда.", gold: 18, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4 },
+        { id: "hepo_ancient_tome", name: "Древний фолиант Хэпо", type: global.ITEM_TYPE.ACCESSORY, price: 1500, desc: "Хэпо изучает забытые тактики, усиливая отряд. Даёт +12% к шансу успеха экспедиций.", intelligence: 8, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 3 },
+        { id: "fatty_energy_crystal", name: "Энергетический кристалл Фэтти", type: global.ITEM_TYPE.ACCESSORY, price: 1600, desc: "Хранит сладкую энергию для длинных походов. Увеличивает здоровье отряда на 18%.", defense: 3, max_health: 60, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 3 },
+        { id: "discipline_golden_scale", name: "Золотые весы Дисциплины", type: global.ITEM_TYPE.ACCESSORY, price: 1550, desc: "Отмеряет выгоду каждой экспедиции. Увеличивает золото с экспедиций на 15%.", intelligence: 4, gold: 12, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 3 },
+        { id: "trinity_medallion", name: "Медальон троицы", type: global.ITEM_TYPE.ACCESSORY, price: 5200, desc: "Синхронизирует такт всех помощниц. Усиливает бафы помощниц на 20%.", strength: 5, intelligence: 5, defense: 5, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4 },
+        { id: "expedition_compass", name: "Компас экспедиций", type: global.ITEM_TYPE.ACCESSORY, price: 4800, desc: "Показывает кратчайший путь через хаос. Сокращает длительность экспедиции на 15%.", agility: 2, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4 },
+        { id: "lucky_dice", name: "Игральные кости удачи", type: global.ITEM_TYPE.ACCESSORY, price: 4900, desc: "Каждый бросок в пользу отряда. Даёт 10% шанс удвоить награды.", gold: 18, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4 },
         { id: "stormcallers_edge", name: "Клинок штормов", type: global.ITEM_TYPE.WEAPON, price: 18500, desc: "Вызывает грозу с каждым взмахом.", strength: 9, agility: 6, slot: global.EQUIP_SLOT.WEAPON, rarity: 4, set_id: "storm_legacy", set_piece_name: "Клинок" },
         { id: "tempest_plate", name: "Панцирь бури", type: global.ITEM_TYPE.ARMOR, price: 17800, desc: "Проводит молнии вдоль контуров брони.", agility: 4, defense: 12, slot: global.EQUIP_SLOT.ARMOR, rarity: 4, set_id: "storm_legacy", set_piece_name: "Панцирь" },
         { id: "cyclone_loop", name: "Кольцо циклона", type: global.ITEM_TYPE.ACCESSORY, price: 16200, desc: "Невидимые вихри защищают владельца.", agility: 5, gold: 8, slot: global.EQUIP_SLOT.ACCESSORY, rarity: 4, set_id: "storm_legacy", set_piece_name: "Кольцо" },
@@ -936,22 +936,23 @@ function scr_init_item_database() {
 
     for (var i = 0; i < array_length(equipment_definitions); i++) {
         var def = equipment_definitions[i];
-        var strength = is_undefined(def.strength) ? 0 : def.strength;
-        var intelligence = is_undefined(def.intelligence) ? 0 : def.intelligence;
-        var defense = is_undefined(def.defense) ? 0 : def.defense;
-        var agility = is_undefined(def.agility) ? 0 : def.agility;
-        var max_health = is_undefined(def.max_health) ? 0 : def.max_health;
-        var health = is_undefined(def.health) ? 0 : def.health;
-        var gold = is_undefined(def.gold) ? 0 : def.gold;
-        var slot = is_undefined(def.slot) ? -1 : def.slot;
-        var rarity = is_undefined(def.rarity) ? 0 : def.rarity;
-        var stackable = is_undefined(def.stackable) ? false : def.stackable;
-        var maxStack = is_undefined(def.maxStack) ? 1 : def.maxStack;
-        var item_class = is_undefined(def.item_class) ? "standard" : def.item_class;
-        var set_id = is_undefined(def.set_id) ? "" : def.set_id;
-        var set_piece_name = is_undefined(def.set_piece_name) ? "" : def.set_piece_name;
+       
+        var strength = variable_struct_exists(def, "strength") ? def.strength : 0;
+        var intelligence = variable_struct_exists(def, "intelligence") ? def.intelligence : 0;
+        var defense = variable_struct_exists(def, "defense") ? def.defense : 0;
+        var agility = variable_struct_exists(def, "agility") ? def.agility : 0;
+        var max_health = variable_struct_exists(def, "max_health") ? def.max_health : 0;
+        var health_bonus = variable_struct_exists(def, "health") ? def.health : 0;
+        var gold = variable_struct_exists(def, "gold") ? def.gold : 0;
+        var slot = variable_struct_exists(def, "slot") ? def.slot : -1;
+        var rarity = variable_struct_exists(def, "rarity") ? def.rarity : 0;
+        var stackable = variable_struct_exists(def, "stackable") ? def.stackable : false;
+        var maxStack = variable_struct_exists(def, "maxStack") ? def.maxStack : 1;
+        var item_class = variable_struct_exists(def, "item_class") ? def.item_class : "standard";
+        var set_id = variable_struct_exists(def, "set_id") ? def.set_id : "";
+        var set_piece_name = variable_struct_exists(def, "set_piece_name") ? def.set_piece_name : "";
 
-        AddItemToDB(def.id, def.name, def.type, def.price, def.desc, strength, intelligence, defense, slot, rarity, stackable, maxStack, item_class, agility, max_health, health, gold, set_id, set_piece_name);
+        AddItemToDB(def.id, def.name, def.type, def.price, def.desc, strength, intelligence, defense, slot, rarity, stackable, maxStack, item_class, agility, max_health, health_bonus, gold, set_id, set_piece_name);
     }
 
     var potion_definitions = [
@@ -1044,10 +1045,32 @@ function AddItemProperties() {
     SetItemProperty("trophy_training_mosaic", "icon", "🎓");
 }
 
+function AddCompanionBuffProperties() {
+    var entries = [
+        { id: "hepo_ancient_tome", buff: "hepo_success", power: 12, description: "🎯 Хэпо направляет экспедиции: +12% к шансу успеха." },
+        { id: "fatty_energy_crystal", buff: "fatty_health", power: 18, description: "🍰 Фэтти делится запасами: +18% к здоровью отряда." },
+        { id: "discipline_golden_scale", buff: "discipline_gold", power: 15, description: "💰 Весы Дисциплины: +15% к наградам экспедиции." },
+        { id: "trinity_medallion", buff: "all_buffs_boost", power: 20, description: "✨ Медальон троицы усиливает бафы помощниц на 20%." },
+        { id: "expedition_compass", buff: "expedition_speed", power: 15, description: "🧭 Компас срезает путь: -15% ко времени экспедиции." },
+        { id: "lucky_dice", buff: "double_rewards", power: 10, description: "🎲 Кости удачи дают 10% шанс удвоить награды." }
+    ];
+
+    for (var i = 0; i < array_length(entries); i++) {
+        var entry = entries[i];
+        SetItemProperty(entry.id, "companion_buff", entry.buff);
+        SetItemProperty(entry.id, "buff_power", entry.power);
+        SetItemProperty(entry.id, "companion_buff_description", entry.description);
+    }
+}
+
 function SetItemProperty(item_id, property, value) {
     var item_data = ds_map_find_value(global.ItemDB, item_id);
     if (item_data != undefined) {
-        ds_map_add(item_data, property, value);
+        if (ds_map_exists(item_data, property)) {
+            ds_map_replace(item_data, property, value);
+        } else {
+            ds_map_add(item_data, property, value);
+        }
     }
 }
 
