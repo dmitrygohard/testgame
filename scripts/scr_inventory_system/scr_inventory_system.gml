@@ -87,27 +87,12 @@ function inventory_destroy_item_database() {
         return;
     }
 
-    var db = global.ItemDB;
-    if (is_undefined(db)) {
-        return;
+    if (!is_undefined(global.ItemDB) && ds_exists(global.ItemDB, ds_type_map)) {
+        ds_map_destroy(global.ItemDB);
     }
-
-    if (!ds_exists(db, ds_type_map)) {
-        return;
-    }
-
-    var keys = ds_map_keys_to_array(db);
-    for (var i = 0; i < array_length(keys); i++) {
-        var key = keys[i];
-        var entry = ds_map_find_value(db, key);
-        if (ds_exists(entry, ds_type_map)) {
-            ds_map_destroy(entry);
-        }
-    }
-
-    ds_map_destroy(db);
+	
     global.ItemDB = undefined;
-}
+
 
 
 function reapply_hero_artifact_effects() {
@@ -2390,4 +2375,5 @@ function clear_featured_slot(_slot_index) {
     if (_slot_index >= 0 && _slot_index < array_length(global.featured_trophies)) {
         global.featured_trophies[_slot_index] = "";
     }
+}
 }

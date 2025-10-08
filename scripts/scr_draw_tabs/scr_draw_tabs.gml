@@ -404,7 +404,7 @@ function draw_inventory_tab(x, y, width, height) {
     var inventory_width = width - (equipment_width + content_gap + margin * 2);
     var panel_height = height - margin * 2;
 
-    draw_equipment_section(equipment_x, y + margin, equipment_width, panel_height);
+        draw_inventory_equipment_panel(equipment_x, y + margin, equipment_width, panel_height);
     draw_inventory_cards(inventory_x, y + margin, inventory_width, panel_height);
 
     draw_inventory_tooltip();
@@ -696,32 +696,6 @@ function draw_inventory_scrollbar(x, y, width, height, total_content_height, vis
     };
 }
 
-function draw_equipment_section(x, y, width, height) {
-
-           var next_goal = "";
-            if (is_struct(set_info) && variable_struct_exists(set_info, "next")) {
-                next_goal = set_info.next;
-            } else if (ds_exists(set_info, ds_type_map) && ds_map_exists(set_info, "next")) {
-                next_goal = set_info[? "next"];
-            }
-
-            if (!is_undefined(next_goal) && next_goal != "") {
-                draw_set_color(ui_text_secondary);
-                draw_text(x + padding + 12, set_y, "Следующая цель: " + string(next_goal));
-                set_y += 16;
-            }
-
-            set_y += 4;
-        }
-    
-
-    if (!has_sets) {
-        draw_set_color(ui_text_secondary);
-        draw_text(x + padding, set_y, "Соберите предметы сетов для уникальных эффектов");
-	}
-    draw_set_font(fnt_main);
-	
-
 function inventory_get_rarity_color(rarity) {
     switch(rarity) {
         case 0: return make_color_rgb(70, 75, 95);
@@ -731,6 +705,198 @@ function inventory_get_rarity_color(rarity) {
         default: return make_color_rgb(215, 150, 75);
     }
 }
+
+function draw_inventory_equipment_panel(x, y, width, height) {
+    draw_set_color(ui_bg_dark);
+    draw_rectangle(x, y, x + width, y + height, false);
+    draw_set_color(ui_border_color);
+    draw_rectangle(x, y, x + width, y + height, true);
+
+    var padding = 14;
+    draw_set_color(ui_text);
+    draw_text(x + padding, y + 6, "Снаряжение героя");
+
+    var portrait_cx = x + width / 2;
+    var portrait_cy = y + 70;
+    var portrait_r = 40;
+
+    draw_set_color(make_color_rgb(55, 65, 95));
+    draw_circle(portrait_cx, portrait_cy, portrait_r + 4, false);
+    draw_set_color(merge_color(ui_highlight, c_white, 0.35));
+    draw_circle(portrait_cx, portrait_cy, portrait_r, false);
+    draw_set_color(c_white);
+    draw_set_halign(fa_center);
+    draw_set_valign(fa_middle);
+    draw_text(portrait_cx, portrait_cy - 4, "🛡️");
+    draw_set_valign(fa_top);
+
+    var hero_equipment = undefined;
+    if (variable_global_exists("equipment_slots") && is_array(global.equipment_slots) && array_length(global.equipment_slots) > 0) {
+        hero_equipment = global.equipment_slots[0];
+    }
+
+    if (!is_struct(hero_equipment)) {
+        hero_equipment = {
+            weapon: -1,
+            armor: -1,
+            accessory: -1,
+            relic: -1
+        };
+    }
+
+    var slot_size = 72;
+    var slot_gap = 26;
+    var grid_width = slot_size * 2 + slot_gap;
+    var grid_x = x + (width - grid_width) / 2;
+    var grid_y = portrait_cy + portrait_r + 20;
+
+    var slots = [
+        { type: "weapon", name: "Оружие", col: 0, row: 0 },
+        { type: "armor", name: "Броня", col: 1, row: 0 },
+        { type: "accessory", name: "Аксессуар", col: 0, row: 1 },
+        { type: "relic", name: "Реликвия", col: 1, row: 1 }
+    ];
+
+    for (var i = 0; i < array_length(slots); i++) {
+        var slot = slots[i];
+        var slot_x = grid_x + slot.col * (slot_size + slot_gap);
+        var slot_y = grid_y + slot.row * (slot_size + slot_gap);
+
+        var item_id = -1;
+        if (variable_struct_exists(hero_equipment, slot.type)) {
+            item_id = variable_struct_get(hero_equipment, slot.type);
+        }
+
+        var filled = (is_real(item_id) && item_id >= 0);
+        var hovered = point_in_rectangle(mouse_x, mouse_y, slot_x, slot_y, slot_x + slot_size, slot_y + slot_size);
+
+        var slot_color = filled
+            ? merge_color(ui_highlight, c_white, hovered ? 0.35 : 0.2)
+            : merge_color(ui_bg_dark, c_white, hovered ? 0.25 : 0.1);
+
+        draw_set_color(slot_color);
+        draw_rectangle(slot_x, slot_y, slot_x + slot_size, slot_y + slot_size, false);
+        draw_set_color(ui_border_color);
+        draw_rectangle(slot_x, slot_y, slot_x + slot_size, slot_y + slot_size, true);
+
+        if (filled) {
+            var slot_item = inventory_fetch_item_definition(item_id);
+            if (!is_undefined(slot_item)) {
+                draw_set_color(c_white);
+                draw_set_halign(fa_center);
+                draw_set_valign(fa_middle);
+                draw_text(slot_x + slot_size / 2, slot_y + slot_size / 2 - 8, inventory_get_item_icon(slot_item));
+
+                var item_name = inventory_source_get(slot_item, "name", "");
+                var short_name = string_copy(item_name, 1, 10);
+                draw_set_color(ui_text_secondary);
+                draw_set_font(fnt_small);
+                draw_text(slot_x + slot_size / 2, slot_y + slot_size - 12, short_name);
+                draw_set_font(fnt_main);
+                draw_set_valign(fa_top);
+
+                if (hovered) {
+                    inventory_register_tooltip(item_id, 1, "equipment");
+                }
+            }
+        } else {
+            draw_set_color(ui_text_secondary);
+            draw_set_halign(fa_center);
+            draw_set_valign(fa_middle);
+            draw_text(slot_x + slot_size / 2, slot_y + slot_size / 2, "+");
+            draw_set_valign(fa_top);
+        }
+
+        draw_set_color(ui_text);
+        draw_set_halign(fa_center);
+        draw_text(slot_x + slot_size / 2, slot_y + slot_size + 6, slot.name);
+        draw_set_halign(fa_left);
+
+        array_push(global.inv_buttons, {
+            type: "equip_slot",
+            hero_index: 0,
+            slot_type: slot.type,
+            x1: slot_x, y1: slot_y,
+            x2: slot_x + slot_size, y2: slot_y + slot_size
+        });
+    }
+
+    var info_lines = [];
+    if (variable_global_exists("hero")) {
+        if (global.hero.equipment_bonuses.strength > 0) array_push(info_lines, "Сила +" + string(global.hero.equipment_bonuses.strength));
+        if (global.hero.equipment_bonuses.intelligence > 0) array_push(info_lines, "Интеллект +" + string(global.hero.equipment_bonuses.intelligence));
+        if (global.hero.equipment_bonuses.defense > 0) array_push(info_lines, "Защита +" + string(global.hero.equipment_bonuses.defense));
+    }
+
+    var bonus_y = grid_y + slot_size * 2 + slot_gap + 20;
+    draw_set_color(ui_text_secondary);
+    draw_set_halign(fa_center);
+
+    if (array_length(info_lines) > 0) {
+        var info_text = "";
+        for (var bi = 0; bi < array_length(info_lines); bi++) {
+            info_text += info_lines[bi];
+            if (bi < array_length(info_lines) - 1) info_text += "   ";
+        }
+        draw_text(x + width / 2, bonus_y, info_text);
+    } else {
+        draw_text(x + width / 2, bonus_y, "Пока нет бонусов от экипировки");
+    }
+    draw_set_halign(fa_left);
+
+    var set_y = bonus_y + 26;
+    draw_set_font(fnt_small);
+    draw_set_color(ui_text_secondary);
+
+    var has_sets = false;
+    if (variable_global_exists("hero") && is_struct(global.hero) && variable_struct_exists(global.hero, "active_sets")) {
+        var active_sets = global.hero.active_sets;
+        if (is_array(active_sets) && array_length(active_sets) > 0) {
+            has_sets = true;
+            for (var si = 0; si < array_length(active_sets); si++) {
+                var set_info = active_sets[si];
+                if (is_undefined(set_info)) continue;
+
+                var set_name = inventory_source_get(set_info, "name", "Неизвестный сет");
+                var owned = inventory_source_get(set_info, "owned", 0);
+                var total = max(1, inventory_source_get(set_info, "total", 1));
+
+                var header = set_name + " · " + string(owned) + "/" + string(total);
+                draw_set_color(owned >= total ? ui_highlight : ui_text_secondary);
+                draw_text(x + padding, set_y, header);
+                set_y += 16;
+
+                var unlocked = inventory_source_get(set_info, "unlocked", []);
+                if (is_array(unlocked)) {
+                    draw_set_color(ui_text_secondary);
+                    for (var ui_line = 0; ui_line < array_length(unlocked); ui_line++) {
+                        draw_text(x + padding + 12, set_y, "• " + string(unlocked[ui_line]));
+                        set_y += 14;
+                    }
+                }
+
+                var next_goal = inventory_source_get(set_info, "next", "");
+                if (next_goal != "") {
+                    draw_set_color(ui_text_secondary);
+                    draw_text(x + padding + 12, set_y, "Следующая цель: " + string(next_goal));
+                    set_y += 16;
+                }
+
+                set_y += 4;
+            }
+        }
+    }
+
+    if (!has_sets) {
+        draw_set_color(ui_text_secondary);
+        draw_text(x + padding, set_y, "Соберите предметы сетов для уникальных эффектов");
+    }
+
+    draw_set_font(fnt_main);
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+}
+
 
 function inventory_source_has_key(db_data, key) {
     if (is_undefined(db_data)) {
@@ -759,6 +925,27 @@ function inventory_source_get(db_data, key, default_value) {
     return default_value;
 }
 
+function inventory_fetch_item_definition(item_id) {
+    if (!is_real(item_id) || item_id < 0) {
+        return undefined;
+    }
+
+    if (!variable_global_exists("ItemDB") || !ds_exists(global.ItemDB, ds_type_map)) {
+        return undefined;
+    }
+
+    if (!ds_map_exists(global.ItemDB, item_id)) {
+        return undefined;
+    }
+
+    var entry = ds_map_find_value(global.ItemDB, item_id);
+    if (entry == -1) {
+        return undefined;
+    }
+
+    return entry;
+}
+
 function inventory_get_item_icon(db_data) {
     var item_type = inventory_source_get(db_data, "type", -1);
 
@@ -768,7 +955,7 @@ function inventory_get_item_icon(db_data) {
         case global.ITEM_TYPE.ACCESSORY: return "💍";
         case global.ITEM_TYPE.POTION: return "🧪";
         case global.ITEM_TYPE.SCROLL: return "📜";
-		case global.ITEM_TYPE.RELIC: return "🗝️";
+        case global.ITEM_TYPE.RELIC: return "🗝️";
         case global.ITEM_TYPE.RESOURCE: return "🪓";
         case global.ITEM_TYPE.TROPHY: return "🏆";
         default:
