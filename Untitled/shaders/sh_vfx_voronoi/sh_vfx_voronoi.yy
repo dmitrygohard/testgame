@@ -1,0 +1,12 @@
+{
+  "$GMShader":"",
+  "%Name":"sh_vfx_voronoi",
+  "name":"sh_vfx_voronoi",
+  "parent":{
+    "name":"Objects",
+    "path":"folders/Objects.yy",
+  },
+  "resourceType":"GMShader",
+  "resourceVersion":"2.0",
+  "type":2,
+}

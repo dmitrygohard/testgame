@@ -1,0 +1,12 @@
+{
+  "$GMShader":"",
+  "%Name":"sh_vfx_polar",
+  "name":"sh_vfx_polar",
+  "parent":{
+    "name":"Objects",
+    "path":"folders/Objects.yy",
+  },
+  "resourceType":"GMShader",
+  "resourceVersion":"2.0",
+  "type":2,
+}

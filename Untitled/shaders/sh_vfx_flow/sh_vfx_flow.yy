@@ -1,0 +1,12 @@
+{
+  "$GMShader":"",
+  "%Name":"sh_vfx_flow",
+  "name":"sh_vfx_flow",
+  "parent":{
+    "name":"Objects",
+    "path":"folders/Objects.yy",
+  },
+  "resourceType":"GMShader",
+  "resourceVersion":"2.0",
+  "type":2,
+}
